@@ -1,23 +1,22 @@
-# [...]
+# To-do with extras
 
-> [!NOTE]
-> Provide a project title in the heading above. Just below this note write a short description of the application you plan to build.
+Description: This project is a simple ASP.NET Core Web API that manages tasks using a relational database.
+Each task moves through multiple workflow states — To-Do, Doing, Review, and Done — allowing basic task tracking similar to a lightweight Kanban board.
 
-[...]
+The application exposes REST endpoints for CRUD tasks, as well as to change their current status. Data is persisted in a relational database.
 
 ## Tech-stack
 
-> [!NOTE]
-> Write a short description of your tech-stack here in terms of programming language(s) and database engine(s).
-
-[...]
+* ASP.NET Core Web API (.NET 10)
+* Entity Framework Core
+* Swagger API
+* PostgreSQL
+* Docker + Docker Compose
 
 ## Architecture
 
-> [!NOTE]
-> Write a short explanation of your planned architecture here.
-
-[...]
+The application is built as a stateless ASP.NET Core Web API using Entity Framework Core for data access. Task data is stored in a relational database, where each task has a workflow status (To-Do, Doing, Review, Done).
+The API and database run in separate Docker containers, with configuration provided through environment variables. This simple architecture supports CI/CD pipelines, automated testing, database migrations, and easy deployment across different environments.
 
 ## Feature plan
 
