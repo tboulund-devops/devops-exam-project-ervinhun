@@ -1,6 +1,6 @@
 # To-do with extras
 
-Description: This project is a simple ASP.NET Core Web API that manages tasks using a relational database.
+This project is a simple ASP.NET Core Web API that manages tasks using a relational database.
 Each task moves through multiple workflow states — To-Do, Doing, Review, and Done — allowing basic task tracking similar to a lightweight Kanban board.
 
 The application exposes REST endpoints for CRUD tasks, as well as to change their current status. Data is persisted in a relational database.
