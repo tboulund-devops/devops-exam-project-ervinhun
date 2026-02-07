@@ -1,0 +1,8 @@
+﻿**/bin/
+**/obj/
+**/.idea/
+.git/
+.gitignore
+Dockerfile*
+docker-compose*
+.env
