@@ -77,7 +77,7 @@ The API and database run in separate Docker containers, with configuration provi
 ### Week 16
 **Feature 1:** Search tasks (by title/description)
 
-**Feature 2:** update status/assignee for multiple tasks in one request
+**Feature 2:** Update status/assignee for multiple tasks in one request.
 
 ### Week 17
 **Feature 1:** System works without bugs (stability + bug fixing).
