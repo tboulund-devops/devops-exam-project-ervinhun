@@ -47,7 +47,7 @@ The API and database run in separate Docker containers, with configuration provi
 **Feature 2:** Remove task
 
 ### Week 10
-**Feature 1:** Filter tasks (e.g. only “Doing”) via query parameters.
+**Feature 1:** Filter tasks (e.g. only "Doing") via query parameters.
 
 **Feature 2:** Sort tasks by creation date or last update via query parameters.
 
