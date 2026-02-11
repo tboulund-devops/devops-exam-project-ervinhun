@@ -29,57 +29,57 @@ The API and database run in separate Docker containers, with configuration provi
 *Kick-off week - no features to be planned here*
 
 ### Week 6
-**Feature 1:** Database planning, and connectiong database to the application
+**Feature 1:** Create a new task
 
-**Feature 2:** Creating Dockerfile and docker-compose
+**Feature 2:** View tasks (list all tasks + get single task by id).
 
 ### Week 7
 *Winter vacation - nothing planned.*
 
 ### Week 8
-**Feature 1:** Startup for Unit test
+**Feature 1:** Move task between workflow states (To-Do, Doing, Review, Done)
 
-**Feature 2:** Writing unit tests for this endpoints
+**Feature 2:** Task status history (store when status changes + from/to)
 
 ### Week 9
-**Feature 1:** Creating entities and endpoints for CRUD
+**Feature 1:** Edit task
 
-**Feature 2:** First version deployment
+**Feature 2:** Remove task
 
 ### Week 10
-**Feature 1:** Fix env variables for the deployed project, ensure that the database is connected
+**Feature 1:** Filter tasks (e.g. only "Doing") via query parameters.
 
-**Feature 2:** Set up Github Actions automatic deployment
+**Feature 2:** Sort tasks by creation date or last update via query parameters.
 
 ### Week 11
-**Feature 1:** Set up E2E testing
+**Feature 1:** Assign task to a user (assignee = name or id).
 
-**Feature 2:** Performance testing
+**Feature 2:** Task comments (add and view comments on a task).
 
 ### Week 12
-**Feature 1:** Track deployment frequency — document and measure how often we deploy to production
+**Feature 1:** Notifications generated when a task is moved to Done.
 
-**Feature 2:** Track lead time for changes — measure time from commit to production deployment using GitHub Actions timestamps
+**Feature 2:** Notification overview (list notifications + mark as read).
 
 ### Week 13
-**Feature 1:** Creating structured logging for the errors
+**Feature 1:** Archive (soft delete) tasks 
 
-**Feature 2:** Send the log files back to the developers, so they can fix the errors
+**Feature 2:** Reopen completed tasks (Done → Doing/To-Do) with rules
 
 ### Week 14
 *Easter vacation - nothing planned.*
 
 ### Week 15
-**Feature 1:** Health check endpoints — add /health and /ready endpoints
+**Feature 1:** Tasks can have a due date.
 
-**Feature 2:** Rolling deployment - setup toggle features
+**Feature 2:** Overdue tasks (return tasks that are overdue).
 
 ### Week 16
-**Feature 1:** To be decided
+**Feature 1:** Search tasks (by title/description)
 
-**Feature 2:** To be decided
+**Feature 2:** Update status/assignee for multiple tasks in one request.
 
 ### Week 17
-**Feature 1:** Fixing upcomming errors and bugs
+**Feature 1:** System works without bugs (stability + bug fixing).
 
-**Feature 2:** Finalising the project
+**Feature 2:** System is stable and ready for final demonstration.
