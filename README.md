@@ -29,7 +29,7 @@ The API and database run in separate Docker containers, with configuration provi
 *Kick-off week - no features to be planned here*
 
 ### Week 6
-**Feature 1:** Create a new task 
+**Feature 1:** Create a new task
 
 **Feature 2:** View tasks (list all tasks + get single task by id).
 
