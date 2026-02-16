@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "dev"]
+  pull_request:
+    branches: ["dev"]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore ./server/server.csproj
+
+      - name: Build
+        run: dotnet build ./server/server.csproj --no-restore --configuration Release
+
+      # Add later when we add tests:
+      # - name: Test
+      #   run: dotnet test ./server/server.csproj --no-build --configuration Release
