@@ -32,6 +32,7 @@ jobs:
         run: dotnet build ./server/server.csproj --no-restore --configuration Release
         
       - name: Run Stryker
+        working-directory: ./server
         run: dotnet stryker
         
       - name: Generate coverage report
