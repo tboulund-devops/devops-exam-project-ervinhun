@@ -16,7 +16,7 @@ on:
 
 jobs:
   sonarqube:
-    runs-on: self-hosted
+    runs-on: [self-hosted, Windows, X64]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
