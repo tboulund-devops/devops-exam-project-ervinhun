@@ -40,7 +40,7 @@ jobs:
         run: |
           dotnet sonarscanner begin \
             /k:"my-dotnet-project" \
-            /d:sonar.host.url="---http://localhost:9000/" \
+            /d:sonar.host.url="http://sonarqube.setgo.dk:9000/" \
             /d:sonar.token="${SONAR_TOKEN}" \
             /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
             /d:sonar.qualitygate.wait=true \
