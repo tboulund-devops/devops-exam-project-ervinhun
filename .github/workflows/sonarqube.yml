@@ -1,0 +1,32 @@
+﻿- name: Install required tools
+  run: |
+    dotnet tool install -g dotnet-sonarscanner
+    dotnet tool install -g dotnet-reportgenerator-globaltool
+
+- name: Start Static Code Analysis
+  run: | # INSERT RELEVANT VARIABLES BELOW
+    dotnet sonarscanner begin \
+      /k:"---MyDevProject---" \
+      /d:sonar.host.url="---http://localhost:9000/---" \
+      /d:sonar.token="---sqp_c2f0c05c0e5933368552934e1ee1136915af6ad7---" \
+      /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
+      /d:sonar.qualitygate.wait=true \
+      /d:sonar.qualitygate.timeout=300
+
+- name: Build
+  run: dotnet build
+
+- name: Run unit tests
+  run: dotnet test --collect:"XPlat Code Coverage" --results-directory TestResults
+
+- name: Generate report
+  run: |
+    reportgenerator \
+      -reports:TestResults/**/coverage.cobertura.xml \
+      -targetdir:coverage-report \
+      -reporttypes:SonarQube
+
+- name: Complete Static Code Analysis
+  run: | # INSERT RELEVANT VARIABLES BELOW
+    dotnet sonarscanner end \
+      /d:sonar.token="---sqp_c2f0c05c0e5933368552934e1ee1136915af6ad7---"
