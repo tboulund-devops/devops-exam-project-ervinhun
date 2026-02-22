@@ -34,11 +34,18 @@ public class DatabaseSeeder
 
         if (!exists)
         {
-            var schemaPath = Path.Combine(AppContext.BaseDirectory, "DataAccess", "schema.sql");
-            var sql = await File.ReadAllTextAsync(schemaPath);
+            try
+            {
+                var schemaPath = Path.Combine(AppContext.BaseDirectory, "DataAccess", "schema.sql");
+                var sql = await File.ReadAllTextAsync(schemaPath);
 
-            await using var createCmd = new NpgsqlCommand(sql, connection);
-            await createCmd.ExecuteNonQueryAsync();
+                await using var createCmd = new NpgsqlCommand(sql, connection);
+                await createCmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Failed to initialize database schema: {ex}");
+            }
         }
     }
 
