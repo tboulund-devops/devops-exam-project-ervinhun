@@ -7,6 +7,8 @@ using server.Utils;
 namespace server.Controller;
 
 [ApiController]
+[Route("api/tasks")]
+
 public class TaskController(MyDbContext ctx) : ControllerBase
 {
     [HttpGet(nameof(GetTasks))]
@@ -119,5 +121,35 @@ public class TaskController(MyDbContext ctx) : ControllerBase
                     Username = task.Assignee.Username
                 }
         };
+    }
+    [HttpPut(nameof(UpdateTask))]
+    public async Task<ActionResult<TaskDto>> UpdateTask([FromQuery] string id, [FromBody] UpdateTaskRequest request)
+    {
+        if (!Guid.TryParse(id, out var taskId))
+        {
+            return BadRequest("Invalid task id.");
+        }
+
+        var task = await ctx.TaskItems
+            .Include(t => t.Assignee)
+            .Include(t => t.Status)
+            .FirstOrDefaultAsync(t => t.Id == taskId && t.DeletedAt == null);
+
+        if (task == null)
+        {
+            return NotFound();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return BadRequest("Title is required.");
+        }
+
+        task.Title = request.Title.Trim();
+        task.Description = request.Description;
+
+        await ctx.SaveChangesAsync();
+
+        return Ok(MapToTaskDto(task));
     }
 }
