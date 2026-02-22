@@ -8,7 +8,7 @@
     dotnet sonarscanner begin \
       /k:"---MyDevProject---" \
       /d:sonar.host.url="---http://localhost:9000/---" \
-      /d:sonar.token="---sqp_c2f0c05c0e5933368552934e1ee1136915af6ad7---" \
+      /d:sonar.token="---SONAR_TOKEN---" \
       /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
       /d:sonar.qualitygate.wait=true \
       /d:sonar.qualitygate.timeout=300
