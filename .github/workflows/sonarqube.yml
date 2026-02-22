@@ -1,32 +1,67 @@
-﻿- name: Install required tools
-  run: |
-    dotnet tool install -g dotnet-sonarscanner
-    dotnet tool install -g dotnet-reportgenerator-globaltool
+﻿name: SonarQube Analysis (.NET)
 
-- name: Start Static Code Analysis
-  run: | # INSERT RELEVANT VARIABLES BELOW
-    dotnet sonarscanner begin \
-      /k:"my-dev-project" \
-      /d:sonar.host.url="http://localhost:9000/" \
-      /d:sonar.token="---SONAR_TOKEN---" \
-      /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
-      /d:sonar.qualitygate.wait=true \
-      /d:sonar.qualitygate.timeout=300
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
-- name: Build
-  run: dotnet build
+permissions:
+  contents: read
 
-- name: Run unit tests
-  run: dotnet test --collect:"XPlat Code Coverage" --results-directory TestResults
+jobs:
+  build-and-analyze:
+    runs-on: ubuntu-latest
 
-- name: Generate report
-  run: |
-    reportgenerator \
-      -reports:TestResults/**/coverage.cobertura.xml \
-      -targetdir:coverage-report \
-      -reporttypes:SonarQube
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-- name: Complete Static Code Analysis
-  run: | # INSERT RELEVANT VARIABLES BELOW
-    dotnet sonarscanner end \
-      /d:sonar.token="SONAR_TOKEN"
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'   # adjust to your SDK
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Install tools
+        run: |
+          dotnet tool install -g dotnet-sonarscanner
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+        env:
+          DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+          DOTNET_NOLOGO: true
+      # Add the .NET tools to PATH for this job
+      - name: Add .NET tools to PATH
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      - name: Start Static Code Analysis
+        run: |
+          dotnet sonarscanner begin \
+            /k:"my-dotnet-project" \
+            /d:sonar.host.url="---http://localhost:9000/" \
+            /d:sonar.token="${SONAR_TOKEN}" \
+            /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
+            /d:sonar.qualitygate.wait=true \
+            /d:sonar.qualitygate.timeout=300
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Run unit tests with coverage
+        run: dotnet test --no-build -c Release \
+          --collect:"XPlat Code Coverage" \
+          --results-directory TestResults
+
+      - name: Generate coverage report (ReportGenerator)
+        run: |
+          reportgenerator \
+            -reports:"TestResults/**/coverage.cobertura.xml" \
+            -targetdir:"coverage-report" \
+            -reporttypes:"SonarQube"
+
+      - name: Complete Static Code Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
