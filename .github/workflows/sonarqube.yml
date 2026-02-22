@@ -2,59 +2,86 @@
 
 on:
   push:
-    branches:
-      - main
-      - master
-      - dev
-      - SonarQube
+    branches: [ main, master, dev, SonarQube ]
   pull_request:
-    branches:
-      - main
-      - master
-      - dev
-      - SonarQube
+    branches: [ main, master, dev, SonarQube ]
 
 jobs:
   sonarqube:
+    # Make sure we target your Windows x64 self-hosted runner
     runs-on: [self-hosted, Windows, X64]
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # recommended for accurate analysis history
+          fetch-depth: 0
 
+      # Install tools and ensure the global tool path is added to PATH
       - name: Install required tools
+        shell: powershell
         run: |
+          # Install global tools
           dotnet tool install -g dotnet-sonarscanner
           dotnet tool install -g dotnet-reportgenerator-globaltool
+
+          # Figure out which account the service is running under and where the global tools live.
+          # If the runner service runs as NETWORK SERVICE, the tools folder is under:
+          #   C:\Windows\ServiceProfiles\NetworkService\.dotnet\tools
+          # If it runs under a user account, it is under:
+          #   $env:USERPROFILE\.dotnet\tools
+
+          $pathsToTry = @(
+            "$env:USERPROFILE\.dotnet\tools",
+            "C:\Windows\ServiceProfiles\NetworkService\.dotnet\tools"
+          )
+
+          $resolved = $pathsToTry | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $resolved) {
+            Write-Error "Could not locate the dotnet tools directory. Checked: $($pathsToTry -join ', ')"
+            exit 1
+          }
+
+          Write-Host "Adding dotnet tools path to PATH: $resolved"
+          # Append to PATH for the remainder of the job
+          $resolved | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+          # Quick sanity check
+          Get-Command dotnet-sonarscanner -ErrorAction Stop | Format-List *
+
         env:
           DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
           DOTNET_NOLOGO: true
 
       - name: Start Static Code Analysis
+        shell: powershell
         run: |
-          dotnet sonarscanner begin \
-            /k:"---MyDevProject---" \
-            /d:sonar.host.url="---http://localhost:9000/---" \
-            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
-            /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
-            /d:sonar.qualitygate.wait=true \
+          dotnet sonarscanner begin `
+            /k:"---MyDevProject---" `
+            /d:sonar.host.url="---http://localhost:9000/---" `
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" `
+            /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" `
+            /d:sonar.qualitygate.wait=true `
             /d:sonar.qualitygate.timeout=300
 
       - name: Build
+        shell: powershell
         run: dotnet build --no-incremental
 
-      - name: Run unit tests
+      - name: Run unit tests (collect coverage)
+        shell: powershell
         run: dotnet test --collect:"XPlat Code Coverage" --results-directory TestResults
 
-      - name: Generate report
+      - name: Generate report for SonarQube (from Cobertura)
+        shell: powershell
         run: |
-          reportgenerator \
-            -reports:TestResults/**/coverage.cobertura.xml \
-            -targetdir:coverage-report \
+          reportgenerator `
+            -reports:TestResults/**/coverage.cobertura.xml `
+            -targetdir:coverage-report `
             -reporttypes:SonarQube
 
       - name: Complete Static Code Analysis
+        shell: powershell
         run: |
-          dotnet sonarscanner end \
+          dotnet sonarscanner end `
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
