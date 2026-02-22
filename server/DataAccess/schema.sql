@@ -61,21 +61,21 @@ CREATE TABLE IF NOT EXISTS notifications (
     );
 
 -- Foreign key indexes
-CREATE INDEX idx_task_item_status_id ON task_item(status_id);
-CREATE INDEX idx_task_item_assignee_id ON task_item(assignee_id);
-CREATE INDEX idx_task_history_task_id ON task_history(task_id);
-CREATE INDEX idx_task_comments_task_id ON task_comments(task_id);
-CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_task_item_status_id ON task_item(status_id);
+CREATE INDEX IF NOT EXISTS idx_task_item_assignee_id ON task_item(assignee_id);
+CREATE INDEX IF NOT EXISTS idx_task_history_task_id ON task_history(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_comments_task_id ON task_comments(task_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 
 -- Soft delete partial indexes
-CREATE INDEX idx_task_item_not_deleted ON task_item(id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_users_not_deleted ON users(id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_task_item_not_deleted ON task_item(id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_users_not_deleted ON users(id) WHERE deleted_at IS NULL;
 
 -- Created_at index
-CREATE INDEX idx_task_item_created_at ON task_item(created_at);
+CREATE INDEX IF NOT EXISTS idx_task_item_created_at ON task_item(created_at);
 
 -- Full text search index
-CREATE INDEX idx_task_item_search_vector ON task_item USING gin(search_vector);
+CREATE INDEX IF NOT EXISTS idx_task_item_search_vector ON task_item USING gin(search_vector);
 
 -- Trigger function
 CREATE OR REPLACE FUNCTION set_updated_at()

@@ -66,7 +66,7 @@ public class DatabaseSeeder
         // Seed Random User
         if (!await context.Users.AnyAsync())
         {
-            var random = Guid.NewGuid().ToString().Substring(0, 8);
+            var random = Guid.NewGuid().ToString("N")[..8];
 
             var user = new User
             {

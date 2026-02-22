@@ -77,13 +77,13 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             .FirstOrDefaultAsync();
         if (toDoStatus == null)
         {
-            throw new KeyNotFoundException("Status did not found with name: To-do");
+            throw new KeyNotFoundException("Status not found with name: To-do");
         }
 
         var user = await ctx.Users.Where(u => u.Id == request.AssigneeId).FirstOrDefaultAsync();
         if (user == null)
         {
-            throw new KeyNotFoundException("User did not found with id: " + request.AssigneeId);
+            throw new KeyNotFoundException("User not found with id: " + request.AssigneeId);
         }
 
         var newTask = new TaskItem

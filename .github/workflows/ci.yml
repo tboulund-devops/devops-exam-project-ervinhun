@@ -37,7 +37,7 @@ jobs:
       #  working-directory: ./server
       #  run: dotnet stryker
         
-      - name: Generate coverage report
+      - name: Upload coverage report (placeholder)
         if: always()
         uses: actions/upload-artifact@v4
         with:
