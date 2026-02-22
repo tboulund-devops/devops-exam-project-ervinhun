@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using server.DataAccess;
 using server.Dto;
+using server.Utils;
 
 namespace server.Controller;
 
@@ -96,6 +97,8 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         };
         await ctx.TaskItems.AddAsync(newTask);
         await ctx.SaveChangesAsync();
+        var saveHistory = new SaveTaskToHistory(ctx);
+        await saveHistory.OnCreate(newTask, user.Id);
         return CreatedAtAction(nameof(GetTaskById), MapToTaskDto(newTask));
     }
 
