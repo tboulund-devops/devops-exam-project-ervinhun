@@ -1,2 +1,3 @@
 <Solution>
+    <Project Path="server.csproj" />
 </Solution>
