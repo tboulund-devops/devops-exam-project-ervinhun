@@ -1,2 +1,3 @@
 <Solution>
+  <Project Path="../test/test.csproj" />
 </Solution>
