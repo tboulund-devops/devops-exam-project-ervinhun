@@ -7,6 +7,7 @@ using server.Utils;
 namespace server.Controller;
 
 [ApiController]
+[Route("api/tasks")]
 public class TaskController(MyDbContext ctx) : ControllerBase
 {
     [HttpGet(nameof(GetTasks))]
@@ -119,5 +120,23 @@ public class TaskController(MyDbContext ctx) : ControllerBase
                     Username = task.Assignee.Username
                 }
         };
+    }
+    [HttpDelete(nameof(DeleteTask))]
+    public async Task<IActionResult> DeleteTask([FromQuery] string id)
+    {
+        if (!Guid.TryParse(id, out var taskId))
+            return BadRequest("Invalid task id.");
+
+        var task = await ctx.TaskItems
+            .FirstOrDefaultAsync(t => t.Id == taskId && t.DeletedAt == null);
+
+        if (task == null)
+            return NotFound();
+
+        task.DeletedAt = DateTime.UtcNow;
+
+        await ctx.SaveChangesAsync();
+
+        return NoContent(); // 204
     }
 }
