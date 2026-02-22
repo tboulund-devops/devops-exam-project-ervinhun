@@ -13,7 +13,7 @@ if (builder.Environment.IsDevelopment())
 
 builder.Configuration.AddEnvironmentVariables();
 
-var db = builder.Configuration.GetSection("CONNECTION_STRING").Value;
+var db = builder.Configuration["CONNECTION_STRING"];
 if (string.IsNullOrWhiteSpace(db))
 {
     throw new InvalidOperationException("CONNECTION_STRING not set in environment or appsettings.json");
@@ -26,14 +26,12 @@ builder.Services.AddOpenApiDocument(config =>
 });
 builder.Services.AddDbContext<MyDbContext>(conf => { conf.UseNpgsql(db); });
 var app = builder.Build();
+await DatabaseSeeder.InitializeAsync(app.Services, builder.Configuration, db);
 
 app.UseStaticFiles();
 app.MapControllers();
 app.UseOpenApi();
 app.UseSwaggerUi();
 
-// app.GenerateApiClientsFromOpenApi("../client/src/generated-ts-client.ts", "./openapi.json").GetAwaiter().GetResult();
-
-await DatabaseSeeder.InitializeAsync(app.Services, builder.Configuration, db);
 
 app.Run();

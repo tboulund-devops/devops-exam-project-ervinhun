@@ -15,10 +15,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         
-      - name: Install tools for coverage and stryker
-        run: |
-          dotnet tool install -g dotnet-reportgenerator-globaltool
-          dotnet tool install -g dotnet-stryker
+      # Enable later when we add tests:
+      #- name: Install tools for coverage and stryker
+      #  run: |
+      #    dotnet tool install -g dotnet-reportgenerator-globaltool
+      #    dotnet tool install -g dotnet-stryker
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
