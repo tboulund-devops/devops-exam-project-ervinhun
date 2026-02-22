@@ -25,4 +25,8 @@
     <PackageReference Include="NSwag.Generation" Version="14.6.3" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.4" />
+  </ItemGroup>
+
 </Project>
