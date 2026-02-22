@@ -1,32 +1,60 @@
-﻿- name: Install required tools
-  run: |
-    dotnet tool install -g dotnet-sonarscanner
-    dotnet tool install -g dotnet-reportgenerator-globaltool
+﻿name: SonarQube Analysis
 
-- name: Start Static Code Analysis
-  run: | # INSERT RELEVANT VARIABLES BELOW
-    dotnet sonarscanner begin \
-      /k:"---MyDevProject---" \
-      /d:sonar.host.url="---http://localhost:9000/---" \
-      /d:sonar.token="---SONAR_TOKEN---" \
-      /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
-      /d:sonar.qualitygate.wait=true \
-      /d:sonar.qualitygate.timeout=300
+on:
+  push:
+    branches:
+      - main
+      - master
+      - dev
+      - SonarQube
+  pull_request:
+    branches:
+      - main
+      - master
+      - dev
+      - SonarQube
 
-- name: Build
-  run: dotnet build
+jobs:
+  sonarqube:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # recommended for accurate analysis history
 
-- name: Run unit tests
-  run: dotnet test --collect:"XPlat Code Coverage" --results-directory TestResults
+      - name: Install required tools
+        run: |
+          dotnet tool install -g dotnet-sonarscanner
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+        env:
+          DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+          DOTNET_NOLOGO: true
 
-- name: Generate report
-  run: |
-    reportgenerator \
-      -reports:TestResults/**/coverage.cobertura.xml \
-      -targetdir:coverage-report \
-      -reporttypes:SonarQube
+      - name: Start Static Code Analysis
+        run: |
+          dotnet sonarscanner begin \
+            /k:"---MyDevProject---" \
+            /d:sonar.host.url="---http://localhost:9000/---" \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+            /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
+            /d:sonar.qualitygate.wait=true \
+            /d:sonar.qualitygate.timeout=300
 
-- name: Complete Static Code Analysis
-  run: | # INSERT RELEVANT VARIABLES BELOW
-    dotnet sonarscanner end \
-      /d:sonar.token="---sqp_c2f0c05c0e5933368552934e1ee1136915af6ad7---"
+      - name: Build
+        run: dotnet build --no-incremental
+
+      - name: Run unit tests
+        run: dotnet test --collect:"XPlat Code Coverage" --results-directory TestResults
+
+      - name: Generate report
+        run: |
+          reportgenerator \
+            -reports:TestResults/**/coverage.cobertura.xml \
+            -targetdir:coverage-report \
+            -reporttypes:SonarQube
+
+      - name: Complete Static Code Analysis
+        run: |
+          dotnet sonarscanner end \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
