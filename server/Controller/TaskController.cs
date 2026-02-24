@@ -70,6 +70,43 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         return task;
     }
 
+[HttpPost(nameof(MoveTask))]
+public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest request)
+{
+    var task = await ctx.TaskItems
+        .Include(t => t.Status)
+        .Where(t => t.Id == request.TaskId && t.DeletedAt == null)
+        .FirstOrDefaultAsync();
+
+    if (task == null)
+        return NotFound("Task not found.");
+
+    var newStatus = await ctx.TodoTaskStatuses
+        .FirstOrDefaultAsync(s => s.Id == request.NewStatusId);
+
+    if (newStatus == null)
+        return NotFound("New status not found.");
+
+    var user = await ctx.Users
+        .FirstOrDefaultAsync(u => u.Id == request.ChangedByUserId);
+
+    if (user == null)
+        return NotFound("User who changes the task not found.");
+
+    var oldStatus = task.Status;
+
+    // Update task
+    task.StatusId = newStatus.Id;
+    task.Status = newStatus;
+    await ctx.SaveChangesAsync();
+
+    // Save history
+    var saveHistory = new SaveTaskToHistory(ctx);
+    await saveHistory.OnStatusChange(task, oldStatus.Id, newStatus.Id, user.Id);
+
+    return Ok(MapToTaskDto(task));
+}
+
     [HttpPost(nameof(CreateTask))]
     public async Task<ActionResult<TaskDto>> CreateTask([FromBody] CreateTaskRequest request)
     {

@@ -24,4 +24,20 @@ public class SaveTaskToHistory(MyDbContext ctx)
         await ctx.TaskHistories.AddAsync(history);
         ctx.SaveChanges();
     }
+    
+    
+    public async Task OnStatusChange(TaskItem task, Guid fromStatusId, Guid toStatusId, Guid changedBy)
+    {
+        var entry = new TaskHistory
+        {
+            TaskId = task.Id,
+            FromStatusId = fromStatusId,
+            ToStatusId = toStatusId,
+            ChangedBy = changedBy
+        };
+
+        ctx.TaskHistories.Add(entry);
+        await ctx.SaveChangesAsync();
+    }
+
 }
