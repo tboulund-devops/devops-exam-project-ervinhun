@@ -1,10 +1,7 @@
 ﻿name: SonarQube Analysis (.NET)
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
 
 permissions:
   contents: read
@@ -16,43 +13,48 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'   # adjust to your SDK
+          dotnet-version: '9.0.x'
 
-      - name: Restore
-        run: dotnet restore
-
-      - name: Install tools
+      - name: Install .NET global tools
         run: |
           dotnet tool install -g dotnet-sonarscanner
           dotnet tool install -g dotnet-reportgenerator-globaltool
         env:
           DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
           DOTNET_NOLOGO: true
-      # Add the .NET tools to PATH for this job
+
       - name: Add .NET tools to PATH
         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-      - name: Start Static Code Analysis
+      - name: Start SonarQube Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           dotnet sonarscanner begin \
-            /k:"my-dotnet-project" \
+            /k:"my-dev-project" \
             /d:sonar.host.url="http://sonarqube.setgo.dk:9000/" \
             /d:sonar.token="${SONAR_TOKEN}" \
             /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
             /d:sonar.qualitygate.wait=true \
             /d:sonar.qualitygate.timeout=300
 
+      - name: Restore
+        run: dotnet restore
+
       - name: Build
         run: dotnet build --no-restore -c Release
 
       - name: Run unit tests with coverage
-        run: dotnet test --no-build -c Release \
-          --collect:"XPlat Code Coverage" \
-          --results-directory TestResults
+        run: |
+          dotnet test --no-build -c Release \
+            --collect:"XPlat Code Coverage" \
+            --results-directory TestResults
 
       - name: Generate coverage report (ReportGenerator)
         run: |
@@ -61,7 +63,7 @@ jobs:
             -targetdir:"coverage-report" \
             -reporttypes:"SonarQube"
 
-      - name: Complete Static Code Analysis
+      - name: Complete SonarQube Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: dotnet sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
