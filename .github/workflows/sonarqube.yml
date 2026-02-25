@@ -32,10 +32,17 @@ jobs:
       - name: Add .NET tools to PATH
         run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
+      # --- TEMP: connectivity check from the GitHub runner -------------------
+      - name: Connectivity test (temporary)
+        run: |
+          echo "DNS:" && getent hosts sonarqube.setgo.dk || true
+          echo "HTTP:" && curl -I --max-time 10 http://sonarqube.setgo.dk:9000 || true
+      # ----------------------------------------------------------------------
+
       # --- SonarQube begin ---------------------------------------------------
       - name: Start SonarQube Analysis
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}    # Project/User token created in YOUR SonarQube server (not SonarCloud)
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}    # Token created on your SonarQube server
         run: |
           dotnet sonarscanner begin \
             /k:"MyDevProject" \
@@ -44,7 +51,7 @@ jobs:
             /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
             /d:sonar.qualitygate.wait="true" \
             /d:sonar.qualitygate.timeout="300"
-      # -----------------------------------------------------------------------
+      # ----------------------------------------------------------------------
 
       - name: Restore
         run: dotnet restore
@@ -71,5 +78,4 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
-      # -----------------------------------------------------------------------
-  
+      # ----------------------------------------------------------------------
