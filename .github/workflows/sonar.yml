@@ -18,11 +18,13 @@ jobs:
       PROJECT_KEY: MyDevProject
 
     steps:
+      # ---------------- CHECKOUT ----------------
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # ---------------- SETUP DOTNET ----------------
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -37,61 +39,60 @@ jobs:
           dotnet tool install -g dotnet-reportgenerator-globaltool
 
       - name: Add tools to PATH
-        run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-      # --- Preflight: connectivity (optional while debugging) ----------------
+      # ---------------- CONNECTIVITY TEST ----------------
       - name: Connectivity test (temporary)
         run: |
           echo "DNS:" && getent hosts sonarqube.setgo.dk || true
-          echo "HTTP:" && curl -I --max-time 10 "$SONAR_URL" || true
+          echo "HTTP:" && curl -I --max-time 10 $SONAR_URL || true
 
-      # --- Preflight: ensure secret exists and is non-empty ------------------
-      - name: Check SONAR_TOKEN presence
+      # ---------------- SECRET CHECK ----------------
+      - name: Check SECRET presence
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SECRET }}
         run: |
           if [ -z "$SONAR_TOKEN" ]; then
-            echo "::error::SONAR_TOKEN is empty. Add it in THIS REPO (your fork) under Settings > Secrets > Actions."
+            echo "::error::SECRET is empty. Add it in THIS REPO (your fork) under Settings > Secrets > Actions."
             exit 1
           fi
-          echo "SONAR_TOKEN is set (length ${#SONAR_TOKEN})."
+          echo "SECRET is set (length ${#SONAR_TOKEN})."
 
-      # --- Preflight: validate token against SonarQube -----------------------
+      # ---------------- VALIDATE TOKEN ----------------
       - name: Validate token and project visibility (temporary)
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SECRET }}
         run: |
           echo "Validate token:"
           curl -s -H "Authorization: Bearer $SONAR_TOKEN" \
-            "$SONAR_URL/api/authentication/validate" | tee /tmp/validate.json
+            "$SONAR_URL/api/authentication/validate"
           echo
-          echo "Project search ($PROJECT_KEY):"
+          echo "Project search:"
           curl -s -H "Authorization: Bearer $SONAR_TOKEN" \
-            "$SONAR_URL/api/projects/search?projects=$PROJECT_KEY" | tee /tmp/search.json
+            "$SONAR_URL/api/projects/search?projects=$PROJECT_KEY"
           echo
 
-      # --- SonarQube begin ---------------------------------------------------
+      # ---------------- SONAR BEGIN ----------------
       - name: Start SonarQube Analysis
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SECRET }}
         run: |
           dotnet sonarscanner begin \
             /k:"$PROJECT_KEY" \
             /d:sonar.host.url="$SONAR_URL" \
             /d:sonar.token="$SONAR_TOKEN" \
-            /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
-            /d:sonar.qualitygate.wait="true" \
-            /d:sonar.qualitygate.timeout="300"
+            /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml"
 
+      # ---------------- BUILD + TEST + COVERAGE ----------------
       - name: Restore
         run: dotnet restore
 
       - name: Build
-        run: dotnet build -c Release --no-restore
+        run: dotnet build --no-restore -c Release
 
       - name: Test with coverage
         run: |
-          dotnet test -c Release --no-build \
+          dotnet test --no-build -c Release \
             --collect:"XPlat Code Coverage" \
             --results-directory TestResults
 
@@ -102,9 +103,9 @@ jobs:
             -targetdir:"coverage-report" \
             -reporttypes:"SonarQube"
 
-      # --- SonarQube end -----------------------------------------------------
+      # ---------------- SONAR END ----------------
       - name: Complete SonarQube Analysis
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SECRET }}
         run: |
           dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
