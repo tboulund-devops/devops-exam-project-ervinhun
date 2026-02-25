@@ -13,9 +13,25 @@ jobs:
   build-and-analyze:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_DB: ToDoApp
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       SONAR_URL: http://sonarqube.setgo.dk:9000
       PROJECT_KEY: MyDevProject
+      CONNECTION_STRING: Host=localhost;Port=5432;Database=ToDoApp;Username=postgres;Password=postgres
 
     steps:
       # ---------------- CHECKOUT ----------------
@@ -28,7 +44,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Install tools
         env:
@@ -71,8 +87,10 @@ jobs:
       - name: Build
         run: dotnet build server/server.csproj --no-restore -c Release
 
-      # ---------------- TEST + COVERAGE (optional) ----------------
+      # ---------------- TEST + COVERAGE ----------------
       - name: Test with coverage
+        env:
+          CONNECTION_STRING: Host=localhost;Port=5432;Database=ToDoApp;Username=postgres;Password=postgres
         run: |
           if [ -f "test/test.csproj" ]; then
             dotnet restore test/test.csproj
