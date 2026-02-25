@@ -44,8 +44,14 @@ jobs:
       # ---------------- CONNECTIVITY TEST ----------------
       - name: Connectivity test (temporary)
         run: |
-          echo "DNS:" && getent hosts sonarqube.setgo.dk || true
-          echo "HTTP:" && curl -I --max-time 10 $SONAR_URL || true
+          echo "=== DNS Resolution ==="
+          getent hosts sonarqube.setgo.dk || echo "DNS FAILED"
+
+          echo "=== TCP Port Check ==="
+          nc -zv sonarqube.setgo.dk 9000 2>&1 || echo "PORT 9000 UNREACHABLE"
+
+          echo "=== HTTP Ping ==="
+          curl -v --max-time 10 "$SONAR_URL/api/system/ping" 2>&1 || echo "HTTP FAILED"
 
       # ---------------- SECRET CHECK ----------------
       - name: Check SECRET presence
@@ -63,12 +69,24 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SECRET }}
         run: |
-          echo "Validate token:"
-          curl -s -H "Authorization: Bearer $SONAR_TOKEN" \
-            "$SONAR_URL/api/authentication/validate"
-          echo
-          echo "Project search:"
-          curl -s -H "Authorization: Bearer $SONAR_TOKEN" \
+          echo "=== DNS Resolution ==="
+          getent hosts sonarqube.setgo.dk || echo "DNS FAILED"
+
+          echo "=== TCP Port Check ==="
+          nc -zv sonarqube.setgo.dk 9000 2>&1 || echo "PORT 9000 UNREACHABLE"
+
+          echo "=== HTTP Ping ==="
+          curl -v --max-time 10 "$SONAR_URL/api/system/ping" 2>&1 || echo "HTTP FAILED"
+
+          echo "=== Validate token ==="
+          RESPONSE=$(curl -s --max-time 10 -w "\nHTTP_STATUS:%{http_code}" \
+            -H "Authorization: Bearer $SONAR_TOKEN" \
+            "$SONAR_URL/api/authentication/validate")
+          echo "$RESPONSE"
+
+          echo "=== Project search ==="
+          curl -s --max-time 10 \
+            -H "Authorization: Bearer $SONAR_TOKEN" \
             "$SONAR_URL/api/projects/search?projects=$PROJECT_KEY"
           echo
 
