@@ -2,11 +2,9 @@
 
 on:
   push:
-    branches:
-      - "**"
+    branches: ["**"]
   pull_request:
-    branches:
-      - "**"
+    branches: ["**"]
 
 permissions:
   contents: read
@@ -14,6 +12,10 @@ permissions:
 jobs:
   build-and-analyze:
     runs-on: ubuntu-latest
+
+    env:
+      SONAR_URL: http://sonarqube.setgo.dk:9000
+      PROJECT_KEY: MyDevProject
 
     steps:
       - name: Checkout
@@ -27,6 +29,9 @@ jobs:
           dotnet-version: '9.0.x'
 
       - name: Install tools
+        env:
+          DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+          DOTNET_NOLOGO: true
         run: |
           dotnet tool install -g dotnet-sonarscanner
           dotnet tool install -g dotnet-reportgenerator-globaltool
@@ -34,15 +39,49 @@ jobs:
       - name: Add tools to PATH
         run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
-      - name: SonarQube begin
+      # --- Preflight: connectivity (optional while debugging) ----------------
+      - name: Connectivity test (temporary)
+        run: |
+          echo "DNS:" && getent hosts sonarqube.setgo.dk || true
+          echo "HTTP:" && curl -I --max-time 10 "$SONAR_URL" || true
+
+      # --- Preflight: ensure secret exists and is non-empty ------------------
+      - name: Check SONAR_TOKEN presence
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "::error::SONAR_TOKEN is empty. Add it in THIS REPO (your fork) under Settings > Secrets > Actions."
+            exit 1
+          fi
+          echo "SONAR_TOKEN is set (length ${#SONAR_TOKEN})."
+
+      # --- Preflight: validate token against SonarQube -----------------------
+      - name: Validate token and project visibility (temporary)
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          echo "Validate token:"
+          curl -s -H "Authorization: Bearer $SONAR_TOKEN" \
+            "$SONAR_URL/api/authentication/validate" | tee /tmp/validate.json
+          echo
+          echo "Project search ($PROJECT_KEY):"
+          curl -s -H "Authorization: Bearer $SONAR_TOKEN" \
+            "$SONAR_URL/api/projects/search?projects=$PROJECT_KEY" | tee /tmp/search.json
+          echo
+
+      # --- SonarQube begin ---------------------------------------------------
+      - name: Start SonarQube Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           dotnet sonarscanner begin \
-            /k:"MyDevProject" \
-            /d:sonar.host.url="http://sonarqube.setgo.dk:9000" \
+            /k:"$PROJECT_KEY" \
+            /d:sonar.host.url="$SONAR_URL" \
             /d:sonar.token="$SONAR_TOKEN" \
-            /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml"
+            /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
+            /d:sonar.qualitygate.wait="true" \
+            /d:sonar.qualitygate.timeout="300"
 
       - name: Restore
         run: dotnet restore
@@ -63,7 +102,8 @@ jobs:
             -targetdir:"coverage-report" \
             -reporttypes:"SonarQube"
 
-      - name: SonarQube end
+      # --- SonarQube end -----------------------------------------------------
+      - name: Complete SonarQube Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
