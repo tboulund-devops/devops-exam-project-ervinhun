@@ -81,6 +81,7 @@ jobs:
             /k:"$PROJECT_KEY" \
             /d:sonar.host.url="$SONAR_URL" \
             /d:sonar.token="$SONAR_TOKEN" \
+            /d:sonar.scanner.scanAll=false \
             /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml"
 
       # ---------------- BUILD + TEST + COVERAGE ----------------
