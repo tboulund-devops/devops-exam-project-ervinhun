@@ -22,27 +22,29 @@ jobs:
           dotnet-version: '9.0.x'
 
       - name: Install .NET global tools
-        run: |
-          dotnet tool install -g dotnet-sonarscanner
-          dotnet tool install -g dotnet-reportgenerator-globaltool
         env:
           DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
           DOTNET_NOLOGO: true
+        run: |
+          dotnet tool install -g dotnet-sonarscanner
+          dotnet tool install -g dotnet-reportgenerator-globaltool
 
       - name: Add .NET tools to PATH
-        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+        run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
+      # --- SonarQube begin ---------------------------------------------------
       - name: Start SonarQube Analysis
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}    # Project/User token created in YOUR SonarQube server (not SonarCloud)
         run: |
           dotnet sonarscanner begin \
             /k:"my-dev-project" \
-            /d:sonar.host.url="http://sonarqube.setgo.dk:9000/" \
-            /d:sonar.token="${SONAR_TOKEN}" \
+            /d:sonar.host.url="http://sonarqube.setgo.dk:9000" \
+            /d:sonar.token="$SONAR_TOKEN" \
             /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
-            /d:sonar.qualitygate.wait=true \
-            /d:sonar.qualitygate.timeout=300
+            /d:sonar.qualitygate.wait="true" \
+            /d:sonar.qualitygate.timeout="300"
+      # -----------------------------------------------------------------------
 
       - name: Restore
         run: dotnet restore
@@ -56,14 +58,18 @@ jobs:
             --collect:"XPlat Code Coverage" \
             --results-directory TestResults
 
-      - name: Generate coverage report (ReportGenerator)
+      - name: Generate coverage report (ReportGenerator -> SonarQube format)
         run: |
           reportgenerator \
             -reports:"TestResults/**/coverage.cobertura.xml" \
             -targetdir:"coverage-report" \
             -reporttypes:"SonarQube"
 
+      # --- SonarQube end (IMPORTANT: pass the token again) -------------------
       - name: Complete SonarQube Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: dotnet sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
+        run: |
+          dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+      # -----------------------------------------------------------------------
+  
