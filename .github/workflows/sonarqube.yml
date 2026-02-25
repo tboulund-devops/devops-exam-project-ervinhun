@@ -38,7 +38,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}    # Project/User token created in YOUR SonarQube server (not SonarCloud)
         run: |
           dotnet sonarscanner begin \
-            /k:"my-dev-project" \
+            /k:"MyDevProject" \
             /d:sonar.host.url="http://sonarqube.setgo.dk:9000" \
             /d:sonar.token="$SONAR_TOKEN" \
             /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
