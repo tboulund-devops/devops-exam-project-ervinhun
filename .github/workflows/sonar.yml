@@ -41,54 +41,16 @@ jobs:
       - name: Add tools to PATH
         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-      # ---------------- CONNECTIVITY TEST ----------------
-      - name: Connectivity test (temporary)
-        run: |
-          echo "=== DNS Resolution ==="
-          getent hosts sonarqube.setgo.dk || echo "DNS FAILED"
-
-          echo "=== TCP Port Check ==="
-          nc -zv sonarqube.setgo.dk 9000 2>&1 || echo "PORT 9000 UNREACHABLE"
-
-          echo "=== HTTP Ping ==="
-          curl -v --max-time 10 "$SONAR_URL/api/system/ping" 2>&1 || echo "HTTP FAILED"
-
       # ---------------- SECRET CHECK ----------------
       - name: Check SECRET presence
         env:
           SONAR_TOKEN: ${{ secrets.SECRET }}
         run: |
           if [ -z "$SONAR_TOKEN" ]; then
-            echo "::error::SECRET is empty. Add it in THIS REPO (your fork) under Settings > Secrets > Actions."
+            echo "::error::SECRET is empty."
             exit 1
           fi
           echo "SECRET is set (length ${#SONAR_TOKEN})."
-
-      # ---------------- VALIDATE TOKEN ----------------
-      - name: Validate token and project visibility (temporary)
-        env:
-          SONAR_TOKEN: ${{ secrets.SECRET }}
-        run: |
-          echo "=== DNS Resolution ==="
-          getent hosts sonarqube.setgo.dk || echo "DNS FAILED"
-
-          echo "=== TCP Port Check ==="
-          nc -zv sonarqube.setgo.dk 9000 2>&1 || echo "PORT 9000 UNREACHABLE"
-
-          echo "=== HTTP Ping ==="
-          curl -v --max-time 10 "$SONAR_URL/api/system/ping" 2>&1 || echo "HTTP FAILED"
-
-          echo "=== Validate token ==="
-          RESPONSE=$(curl -s --max-time 10 -w "\nHTTP_STATUS:%{http_code}" \
-            -H "Authorization: Bearer $SONAR_TOKEN" \
-            "$SONAR_URL/api/authentication/validate")
-          echo "$RESPONSE"
-
-          echo "=== Project search ==="
-          curl -s --max-time 10 \
-            -H "Authorization: Bearer $SONAR_TOKEN" \
-            "$SONAR_URL/api/projects/search?projects=$PROJECT_KEY"
-          echo
 
       # ---------------- SONAR BEGIN ----------------
       - name: Start SonarQube Analysis
@@ -102,16 +64,21 @@ jobs:
             /d:sonar.scanner.scanAll=false \
             /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml"
 
-      # ---------------- BUILD + TEST + COVERAGE ----------------
+      # ---------------- BUILD ----------------
       - name: Restore
-        run: dotnet restore
+        run: |
+          dotnet restore server/server.csproj
+          dotnet restore test/test.csproj
 
       - name: Build
-        run: dotnet build --no-restore -c Release
+        run: |
+          dotnet build server/server.csproj --no-restore -c Release
+          dotnet build test/test.csproj --no-restore -c Release
 
+      # ---------------- TEST + COVERAGE ----------------
       - name: Test with coverage
         run: |
-          dotnet test --no-build -c Release \
+          dotnet test test/test.csproj --no-build -c Release \
             --collect:"XPlat Code Coverage" \
             --results-directory TestResults
 
