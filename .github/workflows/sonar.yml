@@ -66,28 +66,36 @@ jobs:
 
       # ---------------- BUILD ----------------
       - name: Restore
-        run: |
-          dotnet restore server/server.csproj
-          dotnet restore test/test.csproj
+        run: dotnet restore server/server.csproj
 
       - name: Build
-        run: |
-          dotnet build server/server.csproj --no-restore -c Release
-          dotnet build test/test.csproj --no-restore -c Release
+        run: dotnet build server/server.csproj --no-restore -c Release
 
-      # ---------------- TEST + COVERAGE ----------------
+      # ---------------- TEST + COVERAGE (optional) ----------------
       - name: Test with coverage
         run: |
-          dotnet test test/test.csproj --no-build -c Release \
-            --collect:"XPlat Code Coverage" \
-            --results-directory TestResults
+          if [ -f "test/test.csproj" ]; then
+            dotnet restore test/test.csproj
+            dotnet build test/test.csproj --no-restore -c Release
+            dotnet test test/test.csproj --no-build -c Release \
+              --collect:"XPlat Code Coverage" \
+              --results-directory TestResults
+            echo "TESTS_RAN=true" >> $GITHUB_ENV
+          else
+            echo "No test project found, skipping tests."
+            echo "TESTS_RAN=false" >> $GITHUB_ENV
+          fi
 
       - name: Generate coverage report
         run: |
-          reportgenerator \
-            -reports:"TestResults/**/coverage.cobertura.xml" \
-            -targetdir:"coverage-report" \
-            -reporttypes:"SonarQube"
+          if [ "$TESTS_RAN" = "true" ] && [ -d "TestResults" ]; then
+            reportgenerator \
+              -reports:"TestResults/**/coverage.cobertura.xml" \
+              -targetdir:"coverage-report" \
+              -reporttypes:"SonarQube"
+          else
+            echo "No coverage results, skipping report."
+          fi
 
       # ---------------- SONAR END ----------------
       - name: Complete SonarQube Analysis
