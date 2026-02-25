@@ -1,7 +1,7 @@
 ﻿name: SonarQube Analysis (.NET)
 
 on:
-  pull_request:
+  pull_request_target:
 
 permissions:
   contents: read
@@ -11,9 +11,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      # ---------------------------------------------------------
+      # Secure checkout for PRs from forks (required for secrets)
+      # ---------------------------------------------------------
+      - name: Checkout PR code safely
         uses: actions/checkout@v4
         with:
+          # Checkout the HEAD commit of the pull request
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Setup .NET
@@ -32,17 +37,12 @@ jobs:
       - name: Add .NET tools to PATH
         run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
-      # --- TEMP: connectivity check from the GitHub runner -------------------
-      - name: Connectivity test (temporary)
-        run: |
-          echo "DNS:" && getent hosts sonarqube.setgo.dk || true
-          echo "HTTP:" && curl -I --max-time 10 http://sonarqube.setgo.dk:9000 || true
-      # ----------------------------------------------------------------------
-
-      # --- SonarQube begin ---------------------------------------------------
+      # ---------------------------------------------------------
+      # SonarQube BEGIN
+      # ---------------------------------------------------------
       - name: Start SonarQube Analysis
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}    # Token created on your SonarQube server
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           dotnet sonarscanner begin \
             /k:"MyDevProject" \
@@ -51,7 +51,6 @@ jobs:
             /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml" \
             /d:sonar.qualitygate.wait="true" \
             /d:sonar.qualitygate.timeout="300"
-      # ----------------------------------------------------------------------
 
       - name: Restore
         run: dotnet restore
@@ -65,17 +64,18 @@ jobs:
             --collect:"XPlat Code Coverage" \
             --results-directory TestResults
 
-      - name: Generate coverage report (ReportGenerator -> SonarQube format)
+      - name: Generate coverage report (ReportGenerator -> SonarQube)
         run: |
           reportgenerator \
             -reports:"TestResults/**/coverage.cobertura.xml" \
             -targetdir:"coverage-report" \
             -reporttypes:"SonarQube"
 
-      # --- SonarQube end (IMPORTANT: pass the token again) -------------------
+      # ---------------------------------------------------------
+      # SonarQube END
+      # ---------------------------------------------------------
       - name: Complete SonarQube Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
-      # ----------------------------------------------------------------------
