@@ -45,6 +45,7 @@ public static class DatabaseSeeder
             catch (Exception ex)
             {
                 await Console.Error.WriteLineAsync($"Failed to initialize database schema: {ex}");
+                throw;
             }
         }
     }
