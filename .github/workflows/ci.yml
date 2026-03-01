@@ -15,11 +15,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         
-      # Enable later when we add tests:
-      #- name: Install tools for coverage and stryker
-      #  run: |
-      #    dotnet tool install -g dotnet-reportgenerator-globaltool
-      #    dotnet tool install -g dotnet-stryker
+      - name: Install tools for coverage and stryker
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          dotnet tool install -g dotnet-stryker
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -32,10 +31,9 @@ jobs:
       - name: Build
         run: dotnet build ./server/server.csproj --no-restore --configuration Release
        
-      # Enable later when we add tests:
-      #- name: Run Stryker
-      #  working-directory: ./server
-      #  run: dotnet stryker
+      - name: Run Stryker
+        working-directory: ./server
+        run: dotnet stryker
         
       - name: Upload coverage report (placeholder)
         if: always()
@@ -44,6 +42,5 @@ jobs:
           name: coverage-report
           path: StrykerOutput
 
-      # Add later when we add tests:
-      # - name: Test
-      #   run: dotnet test ./server/server.csproj --no-build --configuration Release
+      - name: Test
+        run: dotnet test ./server/server.csproj --no-build --configuration Release

@@ -7,6 +7,7 @@ using server.Utils;
 namespace server.Controller;
 
 [ApiController]
+[Route("api/[controller]")]
 public class TaskController(MyDbContext ctx) : ControllerBase
 {
     [HttpGet(nameof(GetTasks))]
@@ -64,7 +65,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             .FirstOrDefaultAsync();
         if (task == null)
         {
-            return NotFound();
+            return NotFound($"Task not found with id: '{id}'");
         }
 
         return task;
@@ -73,33 +74,60 @@ public class TaskController(MyDbContext ctx) : ControllerBase
     [HttpPost(nameof(CreateTask))]
     public async Task<ActionResult<TaskDto>> CreateTask([FromBody] CreateTaskRequest request)
     {
-        var toDoStatus = await ctx.TodoTaskStatuses.Where(s => s.Name == "To-do")
+        var defaultStatus = await ctx.TodoTaskStatuses.Where(s => s.Name == "Backlog")
             .FirstOrDefaultAsync();
-        if (toDoStatus == null)
+        if (defaultStatus == null)
         {
-            throw new KeyNotFoundException("Status not found with name: To-do");
+            var backlogStatus = new TodoTaskStatus()
+            {
+                Name = "Backlog",
+                CreatedAt = DateTime.UtcNow,
+            };
+            await ctx.TodoTaskStatuses.AddAsync(backlogStatus);
+            await ctx.SaveChangesAsync();
+            defaultStatus = backlogStatus;
         }
-
-        var user = await ctx.Users.Where(u => u.Id == request.AssigneeId).FirstOrDefaultAsync();
-        if (user == null)
+        
+        User? user = null;
+        if (request.AssigneeId != null)
         {
-            throw new KeyNotFoundException("User not found with id: " + request.AssigneeId);
+            user = await ctx.Users.Where(u => u.Id == request.AssigneeId).FirstOrDefaultAsync() ?? null;
+            if (user == null)
+            {
+                return NotFound($"Assignee not found with id: '{request.AssigneeId}'");
+            }
         }
+        
 
         var newTask = new TaskItem
         {
             Title = request.Title,
             Description = request.Description,
             AssigneeId = request.AssigneeId,
-            StatusId = toDoStatus.Id,
-            Status = toDoStatus,
+            StatusId = defaultStatus.Id,
+            Status = defaultStatus,
             Assignee = user
         };
+        
+        //For the history set the uploading user for 'system' at the moment, as we don't have auth yet
+        var systemUser = await ctx.Users.FirstOrDefaultAsync(u => u.Username == "system");
+        if (systemUser == null)        {
+            var addSystemUser = new User
+            {
+                Username = "system",
+                Email = "no.reply@system.com",
+                CreatedAt = DateTime.UtcNow,
+            };
+            await ctx.Users.AddAsync(addSystemUser);
+            await ctx.SaveChangesAsync();
+            systemUser = addSystemUser;
+        }
+        
         await ctx.TaskItems.AddAsync(newTask);
         await ctx.SaveChangesAsync();
         var saveHistory = new SaveTaskToHistory(ctx);
-        await saveHistory.OnCreate(newTask, user.Id);
-        return CreatedAtAction(nameof(GetTaskById), MapToTaskDto(newTask));
+        await saveHistory.OnCreate(newTask, systemUser.Id);
+        return CreatedAtAction(nameof(GetTaskById), new { id = newTask.Id }, MapToTaskDto(newTask));
     }
 
     private TaskDto MapToTaskDto(TaskItem task)
