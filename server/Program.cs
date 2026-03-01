@@ -16,7 +16,7 @@ builder.Configuration.AddEnvironmentVariables();
 var db = builder.Configuration["CONNECTION_STRING"];
 if (string.IsNullOrWhiteSpace(db) && !builder.Environment.IsEnvironment("Test"))
 {
-    throw new InvalidOperationException("CONNECTION_STRING not set in environment or appsettings.json");
+    throw new InvalidOperationException("CONNECTION_STRING not set in environment");
 }
 
 builder.Services.AddOpenApiDocument(config =>
@@ -43,4 +43,4 @@ app.UseOpenApi();
 app.UseSwaggerUi();
 
 
-await app.RunAsync();
+app.Run();

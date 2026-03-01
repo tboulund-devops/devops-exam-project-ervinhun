@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using server.DataAccess;
-using server.Utils;
 using Testcontainers.PostgreSql;
 
 namespace test;
@@ -26,6 +25,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<server.Program>
         {
             await _container.DisposeAsync();
         }
+        await base.DisposeAsync();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -55,7 +55,6 @@ public class CustomWebApplicationFactory : WebApplicationFactory<server.Program>
 
             var ctx = services.BuildServiceProvider().GetRequiredService<MyDbContext>();
             ctx.Database.EnsureCreated();
-            
         });
 
         builder.ConfigureServices(services =>

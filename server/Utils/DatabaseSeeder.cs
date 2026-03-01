@@ -75,13 +75,6 @@ public static class DatabaseSeeder
                     new User { Username = $"user_{random}", Email = $"user_{random}@example.com" }
                 );
             }
-            var user = new User
-            {
-                Username = $"user_{random}",
-                Email = $"user_{random}@example.com"
-            };
-
-            context.Users.Add(user);
             await context.SaveChangesAsync();
         }
     }

@@ -10,22 +10,21 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly CustomWebApplicationFactory _factory;
     private readonly ITestOutputHelper _testOutputHelper;
+    private readonly HttpClient _client;
 
     public UnitTest1(CustomWebApplicationFactory factory, ITestOutputHelper testOutputHelper)
     {
         _factory = factory;
         _testOutputHelper = testOutputHelper;
+        _client = _factory.CreateClient();
     }
 
     [Fact]
     [DisplayName("GetAllTasks returns a Success status code")]
     public async Task GetAllTasks()
     {
-        // Arrange
-        var client = _factory.CreateClient();
-
         // Act
-        var response = await client.GetAsync("/api/Task/GetTasks");
+        var response = await _client.GetAsync("/api/Task/GetTasks");
 
         // Assert
         response.IsSuccessStatusCode.Should().BeTrue();
@@ -35,11 +34,8 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
     [DisplayName("GetTaskById with invalid id returns BadRequest")]
     public async Task GetTaskById_InvalidId()
     {
-        // Arrange
-        var client = _factory.CreateClient();
-
         // Act
-        var response = await client.GetAsync("/api/Task/GetTaskById?id=invalid-id");
+        var response = await _client.GetAsync("/api/Task/GetTaskById?id=invalid-id");
 
         // Assert
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
@@ -50,11 +46,10 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
     public async Task GetTaskById_NonExistingId()
     {
         // Arrange
-        var client = _factory.CreateClient();
         var nonExistingId = Guid.NewGuid().ToString();
 
         // Act
-        var response = await client.GetAsync($"/api/Task/GetTaskById?id={nonExistingId}");
+        var response = await _client.GetAsync($"/api/Task/GetTaskById?id={nonExistingId}");
 
         // Assert
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
@@ -65,23 +60,22 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
     public async Task GetTaskById_ValidId()
     {
         // Arrange
-        var client = _factory.CreateClient();
         var newTask = new CreateTaskRequest
         {
             Title = "Test Task",
             Description = "This is a test task"
         };
-        var createResponse = await client.PostAsJsonAsync("/api/Task/CreateTask", newTask);
+        var createResponse = await _client.PostAsJsonAsync("/api/Task/CreateTask", newTask);
         var error = await createResponse.Content.ReadAsStringAsync();
         _testOutputHelper.WriteLine($"Status: {createResponse.StatusCode}, Error: {error}");
         createResponse.IsSuccessStatusCode.Should().BeTrue($"because create should succeed, but got: {error}");
-        
+
         createResponse.IsSuccessStatusCode.Should().BeTrue();
         var createdTask = await createResponse.Content.ReadFromJsonAsync<TaskDto>();
 
         // Act
-        var response = await client.GetAsync($"/api/Task/GetTaskById?id={createdTask.Id}");
-        
+        var response = await _client.GetAsync($"/api/Task/GetTaskById?id={createdTask.Id}");
+
         // Assert
         response.IsSuccessStatusCode.Should().BeTrue();
         var task = await response.Content.ReadFromJsonAsync<TaskDto>();
@@ -94,7 +88,6 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
     public async Task CreateTask_ValidData()
     {
         // Arrange
-        var client = _factory.CreateClient();
         var newTask = new CreateTaskRequest
         {
             Title = "Test Task2",
@@ -102,7 +95,7 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
         };
 
         // Act
-        var response = await client.PostAsJsonAsync("/api/Task/CreateTask", newTask);
+        var response = await _client.PostAsJsonAsync("/api/Task/CreateTask", newTask);
         var error = await response.Content.ReadAsStringAsync();
         _testOutputHelper.WriteLine($"Status: {response.StatusCode}, Error: {error}");
 
@@ -120,14 +113,13 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
     public async Task CreateTask_MissingTitle()
     {
         // Arrange
-        var client = _factory.CreateClient();
         var newTask = new CreateTaskRequest
         {
             Title = "",
             Description = "This task has no title"
         };
         // Act
-        var response = await client.PostAsJsonAsync("/api/Task/CreateTask", newTask);
+        var response = await _client.PostAsJsonAsync("/api/Task/CreateTask", newTask);
         var error = await response.Content.ReadAsStringAsync();
         _testOutputHelper.WriteLine($"Status: {response.StatusCode}, Error: {error}");
 
@@ -140,7 +132,6 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
     public async Task CreateTask_InvalidAssigneeId()
     {
         // Arrange
-        var client = _factory.CreateClient();
         var newTask = new CreateTaskRequest
         {
             Title = "Test Task with Invalid Assignee",
@@ -149,14 +140,13 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
         };
 
         // Act
-        var response = await client.PostAsJsonAsync("/api/Task/CreateTask", newTask);
+        var response = await _client.PostAsJsonAsync("/api/Task/CreateTask", newTask);
         var error = await response.Content.ReadAsStringAsync();
         _testOutputHelper.WriteLine($"Status: {response.StatusCode}, Error: {error}");
 
         // Assert
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
-        response.Content.Equals("Assignee not found with id: " + newTask.AssigneeId);
+        error.Equals($"Assignee not found with id: '{newTask.AssigneeId}'").Should()
+            .BeTrue($"because the error message should indicate the assignee was not found, but got: {error}");
     }
-    
-
 }

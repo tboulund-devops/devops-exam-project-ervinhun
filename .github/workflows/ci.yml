@@ -43,4 +43,4 @@ jobs:
           path: StrykerOutput
 
       - name: Test
-        run: dotnet test ./server/server.csproj --no-build --configuration Release
+        run: dotnet test ./test/test.csproj --no-build --configuration Release
