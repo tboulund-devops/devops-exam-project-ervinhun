@@ -11,7 +11,7 @@ public class SaveTaskToHistory(MyDbContext ctx)
             .FirstOrDefault();
         if (userIdCheck == Guid.Empty)
         {
-            throw new Exception("User not found.");
+            throw new KeyNotFoundException("User not found.");
         }
 
         var history = new TaskHistory
@@ -22,6 +22,6 @@ public class SaveTaskToHistory(MyDbContext ctx)
             ChangedBy = createdBy,
         };
         await ctx.TaskHistories.AddAsync(history);
-        ctx.SaveChanges();
+        await ctx.SaveChangesAsync();
     }
 }
