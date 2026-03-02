@@ -14,35 +14,43 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        
-      - name: Install tools for coverage and stryker
-        run: |
-          dotnet tool install -g dotnet-reportgenerator-globaltool
-          dotnet tool install -g dotnet-stryker
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
 
+      - name: Install tools for coverage and stryker
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          dotnet tool install -g dotnet-stryker
+
       - name: Restore
         run: dotnet restore ./server/server.csproj
 
       - name: Build
         run: dotnet build ./server/server.csproj --no-restore --configuration Release
-       
+
       - name: Run Stryker
         working-directory: ./server
-        run: dotnet stryker
+        run: dotnet stryker --reporters "html" --log-level "info"
         
       - name: Upload coverage report (placeholder)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: StrykerOutput
+          path: server/StrykerOutput
 
-      - name: Restore Tests
-        run: dotnet restore ./test/test.csproj
-      - name: Build Tests
-        run: dotnet build ./test/test.csproj --no-restore --configuration Release
+      - name: Run Tests with Code Coverage
+        run: dotnet test ./test/test.csproj --configuration Release --collect:"XPlat Code Coverage" --results-directory TestResults --logger "trx;LogFileName=test-results.trx"
+
+      - name: Generate Coverage Report
+        run: reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:"server/coverage-report" -reporttypes:"Html;Badge"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-xplat
+          path: server/coverage-report
