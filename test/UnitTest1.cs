@@ -68,15 +68,15 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
         var createResponse = await _client.PostAsJsonAsync("/api/Task/CreateTask", newTask);
         var error = await createResponse.Content.ReadAsStringAsync();
         _testOutputHelper.WriteLine($"Status: {createResponse.StatusCode}, Error: {error}");
-        createResponse.IsSuccessStatusCode.Should().BeTrue($"because create should succeed, but got: {error}");
 
-        createResponse.IsSuccessStatusCode.Should().BeTrue();
         var createdTask = await createResponse.Content.ReadFromJsonAsync<TaskDto>();
 
         // Act
         var response = await _client.GetAsync($"/api/Task/GetTaskById?id={createdTask.Id}");
 
         // Assert
+        createResponse.IsSuccessStatusCode.Should().BeTrue($"because create should succeed, but got: {error}");
+        
         response.IsSuccessStatusCode.Should().BeTrue();
         var task = await response.Content.ReadFromJsonAsync<TaskDto>();
         task.Should().NotBeNull();
