@@ -46,11 +46,11 @@ jobs:
         run: dotnet test ./test/test.csproj --configuration Release --collect:"XPlat Code Coverage" --results-directory TestResults --logger "trx;LogFileName=test-results.trx"
 
       - name: Generate Coverage Report
-        run: reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:"server/coverage-report" -reporttypes:"Html;Badge"
+        run: reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage-report -reporttypes:Html
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report-xplat
-          path: server/coverage-report
+          path: coverage-report
