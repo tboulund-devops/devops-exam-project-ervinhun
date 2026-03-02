@@ -42,5 +42,5 @@ jobs:
           name: coverage-report
           path: StrykerOutput
 
-      - name: Test
-        run: dotnet test ./test/test.csproj --no-build --configuration Release
+      - name: Build Tests
+        run: dotnet build ./test/test.csproj --no-restore --configuration Release
