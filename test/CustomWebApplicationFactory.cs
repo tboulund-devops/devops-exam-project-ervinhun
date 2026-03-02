@@ -53,19 +53,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<server.Program>
                 services.AddDbContext<MyDbContext>(options => { options.UseNpgsql(connectionString); });
             }
 
-            var ctx = services.BuildServiceProvider().GetRequiredService<MyDbContext>();
-            ctx.Database.EnsureCreated();
-        });
-
-        builder.ConfigureServices(services =>
-        {
-            // Build the service provider and create the database
-            var sp = services.BuildServiceProvider();
-            using var scope = sp.CreateScope();
+            // Build a scoped service provider and ensure the database is created once
+            using var serviceProvider = services.BuildServiceProvider();
+            using var scope = serviceProvider.CreateScope();
             var scopedServices = scope.ServiceProvider;
             var db = scopedServices.GetRequiredService<MyDbContext>();
-
-            // Ensure database is created
             db.Database.EnsureCreated();
         });
     }
