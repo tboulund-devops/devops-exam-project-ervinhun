@@ -33,7 +33,7 @@ jobs:
 
       - name: Run Stryker
         working-directory: ./server
-        run: dotnet stryker --reporters "html" --log-level "info"
+        run: dotnet stryker
         
       - name: Upload coverage report (placeholder)
         if: always()
