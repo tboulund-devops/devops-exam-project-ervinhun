@@ -154,7 +154,10 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         }
 
         task.Title = request.Title.Trim();
-        task.Description = request.Description;
+        if (request.Description != null)
+        {
+            task.Description = request.Description;
+        }
 
         if (request.AssigneeId != task.AssigneeId)
         {
