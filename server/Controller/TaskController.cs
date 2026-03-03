@@ -171,7 +171,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
                 var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == request.AssigneeId);
                 if (user == null)
                 {
-                    return BadRequest("User not found with id: " + request.AssigneeId);
+                    return NotFound("User not found with id: " + request.AssigneeId);
                 }
                 task.AssigneeId = user.Id;
                 task.Assignee = user;
