@@ -74,6 +74,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
 public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest request)
 {
     var task = await ctx.TaskItems
+        .Include(t => t.Assignee)
         .Include(t => t.Status)
         .Where(t => t.Id == request.TaskId && t.DeletedAt == null)
         .FirstOrDefaultAsync();
