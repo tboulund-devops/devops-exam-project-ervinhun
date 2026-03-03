@@ -79,19 +79,25 @@ public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest req
         .FirstOrDefaultAsync();
 
     if (task == null)
-        return NotFound("Task not found.");
+    {
+        throw new KeyNotFoundException("Task not found.");
+    }
 
     var newStatus = await ctx.TodoTaskStatuses
         .FirstOrDefaultAsync(s => s.Id == request.NewStatusId);
 
     if (newStatus == null)
-        return NotFound("New status not found.");
+    {
+        throw new KeyNotFoundException("New status not found.");
+    }
 
     var user = await ctx.Users
         .FirstOrDefaultAsync(u => u.Id == request.ChangedByUserId);
 
     if (user == null)
-        return NotFound("User who changes the task not found.");
+    {
+        throw new KeyNotFoundException("User who changes the task not found.");
+    }
 
     var oldStatus = task.Status;
 
