@@ -10,6 +10,14 @@ namespace server.Controller;
 [Route("api/tasks")]
 public class TaskController(MyDbContext ctx) : ControllerBase
 {
+    
+    [HttpGet("Users")]
+    public async Task<IActionResult> GetUsers()
+    {
+        return Ok(await ctx.Users.ToListAsync());
+    }
+    
+    
     [HttpGet(nameof(GetTasks))]
     public async Task<List<TaskDto>> GetTasks()
     {
