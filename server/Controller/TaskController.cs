@@ -95,6 +95,9 @@ public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest req
 
     var oldStatus = task.Status;
 
+    if (oldStatus.Id == newStatus.Id)
+        return BadRequest("Task is already in the requested status.");
+
     // Update task
     task.StatusId = newStatus.Id;
     task.Status = newStatus;
