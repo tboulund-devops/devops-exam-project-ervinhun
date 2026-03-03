@@ -57,7 +57,7 @@ public class DatabaseSeeder
             context.TodoTaskStatuses.AddRange(
                 new TodoTaskStatus { Name = "To-do" },
                 new TodoTaskStatus { Name = "Doing" },
-                new TodoTaskStatus { Name = "Review" },   // <-- Missing
+                new TodoTaskStatus { Name = "Review" },
                 new TodoTaskStatus { Name = "Done" }
             );
 
