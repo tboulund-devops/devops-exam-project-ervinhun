@@ -148,6 +148,25 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         task.Title = request.Title.Trim();
         task.Description = request.Description;
 
+        if (request.AssigneeId != task.AssigneeId)
+        {
+            if (request.AssigneeId == null)
+            {
+                task.AssigneeId = null;
+                task.Assignee = null;
+            }
+            else
+            {
+                var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == request.AssigneeId);
+                if (user == null)
+                {
+                    return BadRequest("User not found with id: " + request.AssigneeId);
+                }
+                task.AssigneeId = user.Id;
+                task.Assignee = user;
+            }
+        }
+
         await ctx.SaveChangesAsync();
 
         return Ok(MapToTaskDto(task));
