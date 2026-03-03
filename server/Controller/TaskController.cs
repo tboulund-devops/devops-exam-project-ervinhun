@@ -11,6 +11,14 @@ namespace server.Controller;
 
 public class TaskController(MyDbContext ctx) : ControllerBase
 {
+    
+    [HttpGet("Users")]
+    public async Task<IActionResult> GetUsers()
+    {
+        return Ok(await ctx.Users.ToListAsync());
+    }
+    
+    
     [HttpGet(nameof(GetTasks))]
     public async Task<List<TaskDto>> GetTasks()
     {
@@ -170,5 +178,24 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         await ctx.SaveChangesAsync();
 
         return Ok(MapToTaskDto(task));
+        }
+        
+    [HttpDelete(nameof(DeleteTask))]
+    public async Task<IActionResult> DeleteTask([FromQuery] string id)
+    {
+        if (!Guid.TryParse(id, out var taskId))
+            return BadRequest("Invalid task id.");
+
+        var task = await ctx.TaskItems
+            .FirstOrDefaultAsync(t => t.Id == taskId && t.DeletedAt == null);
+
+        if (task == null)
+            return NotFound();
+
+        task.DeletedAt = DateTime.UtcNow;
+
+        await ctx.SaveChangesAsync();
+
+        return NoContent(); // 204
     }
 }
