@@ -1,0 +1,128 @@
+﻿name: SonarQube Analysis (Fork)
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-analyze:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_DB: ToDoApp
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SONAR_URL: http://sonarqube.setgo.dk:9000
+      PROJECT_KEY: MyDevProject
+      CONNECTION_STRING: Host=localhost;Port=5432;Database=ToDoApp;Username=postgres;Password=postgres
+
+    steps:
+      # ---------------- CHECKOUT ----------------
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ---------------- SETUP DOTNET ----------------
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install tools
+        env:
+          DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+          DOTNET_NOLOGO: true
+        run: |
+          dotnet tool install -g dotnet-sonarscanner
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+
+      - name: Add tools to PATH
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      # ---------------- SECRET CHECK ----------------
+      - name: Check SECRET presence
+        env:
+          SONAR_TOKEN: ${{ secrets.SECRET }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "::error::SECRET is empty."
+            exit 1
+          fi
+          echo "SECRET is set (length ${#SONAR_TOKEN})."
+
+      # ---------------- SONAR BEGIN ----------------
+      - name: Start SonarQube Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SECRET }}
+        run: |
+          dotnet sonarscanner begin \
+            /k:"$PROJECT_KEY" \
+            /d:sonar.host.url="$SONAR_URL" \
+            /d:sonar.token="$SONAR_TOKEN" \
+            /d:sonar.scanner.scanAll=false \
+            /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml"
+
+      # ---------------- BUILD ----------------
+      - name: Restore
+        run: dotnet restore server/server.csproj
+
+      - name: Build
+        run: dotnet build server/server.csproj --no-restore -c Release
+
+      # ---------------- TEST + COVERAGE ----------------
+      - name: Test with coverage
+        env:
+          CONNECTION_STRING: Host=localhost;Port=5432;Database=ToDoApp;Username=postgres;Password=postgres
+        run: |
+          if [ -f "test/test.csproj" ]; then
+            dotnet restore test/test.csproj
+            dotnet build test/test.csproj --no-restore -c Release
+            dotnet test test/test.csproj --no-build -c Release \
+              --collect:"XPlat Code Coverage" \
+              --results-directory TestResults
+            echo "TESTS_RAN=true" >> $GITHUB_ENV
+          else
+            echo "No test project found, skipping tests."
+            echo "TESTS_RAN=false" >> $GITHUB_ENV
+          fi
+
+      - name: Generate coverage report
+        run: |
+          if [ "$TESTS_RAN" = "true" ] && [ -d "TestResults" ]; then
+            reportgenerator \
+              -reports:"TestResults/**/coverage.cobertura.xml" \
+              -targetdir:"coverage-report" \
+              -reporttypes:"SonarQube"
+          else
+            echo "No coverage results, skipping report."
+          fi
+
+      # ---------------- SONAR END ----------------
+      - name: Complete SonarQube Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SECRET }}
+        run: |
+          dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
