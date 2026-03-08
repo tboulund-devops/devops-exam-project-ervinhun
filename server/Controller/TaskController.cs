@@ -159,23 +159,15 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             task.Description = request.Description;
         }
 
-        if (request.AssigneeId != task.AssigneeId)
+        if (request.AssigneeId != null && request.AssigneeId != task.AssigneeId)
         {
-            if (request.AssigneeId == null)
+            var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == request.AssigneeId);
+            if (user == null)
             {
-                task.AssigneeId = null;
-                task.Assignee = null;
+                return NotFound("User not found with id: " + request.AssigneeId);
             }
-            else
-            {
-                var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == request.AssigneeId);
-                if (user == null)
-                {
-                    return NotFound("User not found with id: " + request.AssigneeId);
-                }
-                task.AssigneeId = user.Id;
-                task.Assignee = user;
-            }
+            task.AssigneeId = user.Id;
+            task.Assignee = user;
         }
 
         await ctx.SaveChangesAsync();
