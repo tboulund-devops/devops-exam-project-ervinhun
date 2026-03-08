@@ -10,14 +10,13 @@ namespace server.Controller;
 [Route("api/[controller]")]
 public class TaskController(MyDbContext ctx) : ControllerBase
 {
-    
     [HttpGet("Users")]
     public async Task<IActionResult> GetUsers()
     {
         return Ok(await ctx.Users.ToListAsync());
     }
-    
-    
+
+
     [HttpGet(nameof(GetTasks))]
     public async Task<List<TaskDto>> GetTasks()
     {
@@ -51,6 +50,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         {
             return BadRequest("Invalid task id.");
         }
+
         var task = await ctx.TaskItems
             .Include(t => t.Assignee)
             .Include(t => t.Status)
@@ -79,54 +79,54 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         return task;
     }
 
-[HttpPost(nameof(MoveTask))]
-public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest request)
-{
-    var task = await ctx.TaskItems
-        .Include(t => t.Assignee)
-        .Include(t => t.Status)
-        .Where(t => t.Id == request.TaskId && t.DeletedAt == null)
-        .FirstOrDefaultAsync();
-
-    if (task == null)
+    [HttpPost(nameof(MoveTask))]
+    public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest request)
     {
-        throw new KeyNotFoundException("Task not found.");
+        var task = await ctx.TaskItems
+            .Include(t => t.Assignee)
+            .Include(t => t.Status)
+            .Where(t => t.Id == request.TaskId && t.DeletedAt == null)
+            .FirstOrDefaultAsync();
+
+        if (task == null)
+        {
+            throw new KeyNotFoundException("Task not found.");
+        }
+
+        var newStatus = await ctx.TodoTaskStatuses
+            .FirstOrDefaultAsync(s => s.Id == request.NewStatusId);
+
+        if (newStatus == null)
+        {
+            throw new KeyNotFoundException("New status not found.");
+        }
+
+        var user = await ctx.Users
+            .FirstOrDefaultAsync(u => u.Id == request.ChangedByUserId);
+
+        if (user == null)
+        {
+            throw new KeyNotFoundException("User who changes the task not found.");
+        }
+
+        var oldStatus = task.Status;
+
+        // Update task
+        task.StatusId = newStatus.Id;
+        task.Status = newStatus;
+        await ctx.SaveChangesAsync();
+
+        // Save history
+        var saveHistory = new SaveTaskToHistory(ctx);
+        await saveHistory.OnStatusChange(task, oldStatus.Id, newStatus.Id, user.Id);
+
+        return Ok(MapToTaskDto(task));
     }
-
-    var newStatus = await ctx.TodoTaskStatuses
-        .FirstOrDefaultAsync(s => s.Id == request.NewStatusId);
-
-    if (newStatus == null)
-    {
-        throw new KeyNotFoundException("New status not found.");
-    }
-
-    var user = await ctx.Users
-        .FirstOrDefaultAsync(u => u.Id == request.ChangedByUserId);
-
-    if (user == null)
-    {
-        throw new KeyNotFoundException("User who changes the task not found.");
-    }
-
-    var oldStatus = task.Status;
-
-    // Update task
-    task.StatusId = newStatus.Id;
-    task.Status = newStatus;
-    await ctx.SaveChangesAsync();
-
-    // Save history
-    var saveHistory = new SaveTaskToHistory(ctx);
-    await saveHistory.OnStatusChange(task, oldStatus.Id, newStatus.Id, user.Id);
-
-    return Ok(MapToTaskDto(task));
-}
 
     [HttpPost(nameof(CreateTask))]
     public async Task<ActionResult<TaskDto>> CreateTask([FromBody] CreateTaskRequest request)
     {
-        var defaultStatus = await ctx.TodoTaskStatuses.Where(s => s.Name == "Backlog")
+        var defaultStatus = await ctx.TodoTaskStatuses.Where(s => s.Name == "Backlog" && s.DeletedAt == null)
             .FirstOrDefaultAsync();
         if (defaultStatus == null)
         {
@@ -139,11 +139,11 @@ public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest req
             await ctx.SaveChangesAsync();
             defaultStatus = backlogStatus;
         }
-        
+
         User? user = null;
         if (request.AssigneeId != null)
         {
-            user = await ctx.Users.Where(u => u.Id == request.AssigneeId).FirstOrDefaultAsync() ?? null;
+            user = await ctx.Users.Where(u => u.Id == request.AssigneeId && u.DeletedAt == null).FirstOrDefaultAsync();
             if (user == null)
             {
                 return NotFound($"Assignee not found with id: '{request.AssigneeId}'");
@@ -159,10 +159,11 @@ public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest req
             Status = defaultStatus,
             Assignee = user
         };
-        
+
         //For the history set the uploading user for 'system' at the moment, as we don't have auth yet
         var systemUser = await ctx.Users.FirstOrDefaultAsync(u => u.Username == "system");
-        if (systemUser == null)        {
+        if (systemUser == null)
+        {
             var addSystemUser = new User
             {
                 Username = "system",
@@ -173,7 +174,7 @@ public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest req
             await ctx.SaveChangesAsync();
             systemUser = addSystemUser;
         }
-        
+
         await ctx.TaskItems.AddAsync(newTask);
         await ctx.SaveChangesAsync();
         var saveHistory = new SaveTaskToHistory(ctx);
@@ -199,6 +200,7 @@ public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest req
                 }
         };
     }
+
     [HttpPut(nameof(UpdateTask))]
     public async Task<ActionResult<TaskDto>> UpdateTask([FromQuery] string id, [FromBody] UpdateTaskRequest request)
     {
@@ -231,6 +233,7 @@ public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest req
             {
                 return NotFound("User not found with id: " + request.AssigneeId);
             }
+
             task.AssigneeId = user.Id;
             task.Assignee = user;
         }
@@ -238,8 +241,8 @@ public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest req
         await ctx.SaveChangesAsync();
 
         return Ok(MapToTaskDto(task));
-        }
-        
+    }
+
     [HttpDelete(nameof(DeleteTask))]
     public async Task<IActionResult> DeleteTask([FromQuery] string id)
     {

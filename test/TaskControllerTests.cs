@@ -6,18 +6,10 @@ using Xunit.Abstractions;
 
 namespace test;
 
-public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
+public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutputHelper testOutputHelper)
+    : IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly CustomWebApplicationFactory _factory;
-    private readonly ITestOutputHelper _testOutputHelper;
-    private readonly HttpClient _client;
-
-    public UnitTest1(CustomWebApplicationFactory factory, ITestOutputHelper testOutputHelper)
-    {
-        _factory = factory;
-        _testOutputHelper = testOutputHelper;
-        _client = _factory.CreateClient();
-    }
+    private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
     [DisplayName("GetAllTasks returns a Success status code")]
@@ -67,9 +59,14 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
         };
         var createResponse = await _client.PostAsJsonAsync("/api/Task/CreateTask", newTask);
         var error = await createResponse.Content.ReadAsStringAsync();
-        _testOutputHelper.WriteLine($"Status: {createResponse.StatusCode}, Error: {error}");
+        testOutputHelper.WriteLine($"Status: {createResponse.StatusCode}, Error: {error}");
 
         var createdTask = await createResponse.Content.ReadFromJsonAsync<TaskDto>();
+
+        if (createdTask == null)
+        {
+            throw new Exception($"Failed to create task for testing GetTaskById. Error: {error}");
+        }
 
         // Act
         var response = await _client.GetAsync($"/api/Task/GetTaskById?id={createdTask.Id}");
@@ -77,7 +74,7 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
         // Assert
         createResponse.IsSuccessStatusCode.Should().BeTrue($"because create should succeed, but got: {error}");
         createdTask.Should().NotBeNull("because the created task response should be deserializable");
-        
+        response.Should().NotBeNull();
         response.IsSuccessStatusCode.Should().BeTrue();
         var task = await response.Content.ReadFromJsonAsync<TaskDto>();
         task.Should().NotBeNull();
@@ -98,7 +95,7 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
         // Act
         var response = await _client.PostAsJsonAsync("/api/Task/CreateTask", newTask);
         var error = await response.Content.ReadAsStringAsync();
-        _testOutputHelper.WriteLine($"Status: {response.StatusCode}, Error: {error}");
+        testOutputHelper.WriteLine($"Status: {response.StatusCode}, Error: {error}");
 
         // Assert
         response.IsSuccessStatusCode.Should().BeTrue($"because create should succeed, but got: {error}");
@@ -122,14 +119,14 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
         // Act
         var response = await _client.PostAsJsonAsync("/api/Task/CreateTask", newTask);
         var error = await response.Content.ReadAsStringAsync();
-        _testOutputHelper.WriteLine($"Status: {response.StatusCode}, Error: {error}");
+        testOutputHelper.WriteLine($"Status: {response.StatusCode}, Error: {error}");
 
         // Assert
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
     }
 
     [Fact]
-    [DisplayName("CreateTask with invalid AssigneeId returns BadRequest")]
+    [DisplayName("CreateTask with invalid AssigneeId returns NotFound")]
     public async Task CreateTask_InvalidAssigneeId()
     {
         // Arrange
@@ -143,11 +140,13 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
         // Act
         var response = await _client.PostAsJsonAsync("/api/Task/CreateTask", newTask);
         var error = await response.Content.ReadAsStringAsync();
-        _testOutputHelper.WriteLine($"Status: {response.StatusCode}, Error: {error}");
+        testOutputHelper.WriteLine($"Status: {response.StatusCode}, Error: {error}");
 
         // Assert
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
-        error.Equals($"Assignee not found with id: '{newTask.AssigneeId}'").Should()
-            .BeTrue($"because the error message should indicate the assignee was not found, but got: {error}");
+        error.Should().Be(
+            $"Assignee not found with id: '{newTask.AssigneeId}'",
+            "because the error message should indicate the assignee was not found, but got: {0}",
+            error);
     }
 }
