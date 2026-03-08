@@ -32,11 +32,11 @@ jobs:
         run: dotnet build ./server/server.csproj --no-restore --configuration Release
 
       - name: Run Stryker
-        working-directory: ./
         run: |
-          dotnet stryker --project ./server/server.csproj 
-          --test-project ./test/test.csproj 
+          dotnet stryker --project ./server/server.csproj
+          --test-project ./test/test.csproj
           --output ./StrykerOutput
+          
         
       - name: Upload coverage report (placeholder)
         if: always()
