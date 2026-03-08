@@ -166,7 +166,7 @@ public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest req
             var addSystemUser = new User
             {
                 Username = "system",
-                Email = "no.reply@system.com",
+                Email = "no-reply@system.com",
                 CreatedAt = DateTime.UtcNow,
             };
             await ctx.Users.AddAsync(addSystemUser);

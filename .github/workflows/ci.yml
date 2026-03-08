@@ -22,8 +22,8 @@ jobs:
 
       - name: Install tools for coverage and stryker
         run: |
-          dotnet tool install -g dotnet-reportgenerator-globaltool
-          dotnet tool install -g dotnet-stryker
+          dotnet tool install -g dotnet-reportgenerator-globaltool --version 5.3.9
+          dotnet tool install -g dotnet-stryker --version 4.0.0
 
       - name: Restore
         run: dotnet restore ./server/server.csproj
@@ -33,7 +33,7 @@ jobs:
 
       - name: Run Stryker
         working-directory: ./server
-        run: dotnet stryker --project-file ./server.csproj --test-project-file ../test/test.csproj
+        run: dotnet stryker --project ./server.csproj --test-project ../test/test.csproj
         
       - name: Upload coverage report (placeholder)
         if: always()

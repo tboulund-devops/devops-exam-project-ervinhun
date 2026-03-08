@@ -76,6 +76,7 @@ public class UnitTest1 : IClassFixture<CustomWebApplicationFactory>
 
         // Assert
         createResponse.IsSuccessStatusCode.Should().BeTrue($"because create should succeed, but got: {error}");
+        createdTask.Should().NotBeNull("because the created task response should be deserializable");
         
         response.IsSuccessStatusCode.Should().BeTrue();
         var task = await response.Content.ReadFromJsonAsync<TaskDto>();

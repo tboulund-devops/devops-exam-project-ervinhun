@@ -70,13 +70,10 @@ public static class DatabaseSeeder
         if (!await context.Users.AnyAsync())
         {
             var random = Guid.NewGuid().ToString("N")[..8];
-            if (!await context.Users.AnyAsync())
-            {
-                context.Users.AddRange(
-                    new User { Username = "system", Email = "no-reply@system.com" },
-                    new User { Username = $"user_{random}", Email = $"user_{random}@example.com" }
-                );
-            }
+            context.Users.AddRange(
+                new User { Username = "system", Email = "no-reply@system.com" },
+                new User { Username = $"user_{random}", Email = $"user_{random}@example.com" }
+            );
             await context.SaveChangesAsync();
         }
     }
