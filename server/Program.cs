@@ -6,6 +6,17 @@ using server.Utils;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 if (builder.Environment.IsDevelopment())
 {
     Env.Load();
@@ -38,9 +49,12 @@ if (!builder.Environment.IsEnvironment("Test"))
 }
 
 app.UseStaticFiles();
+
+// Use CORS before controllers
+app.UseCors();
+
 app.MapControllers();
 app.UseOpenApi();
 app.UseSwaggerUi();
-
 
 app.Run();

@@ -10,6 +10,14 @@ namespace server.Controller;
 [Route("api/[controller]")]
 public class TaskController(MyDbContext ctx) : ControllerBase
 {
+    
+    [HttpGet("Users")]
+    public async Task<IActionResult> GetUsers()
+    {
+        return Ok(await ctx.Users.ToListAsync());
+    }
+    
+    
     [HttpGet(nameof(GetTasks))]
     public async Task<List<TaskDto>> GetTasks()
     {
@@ -71,6 +79,50 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         return task;
     }
 
+[HttpPost(nameof(MoveTask))]
+public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest request)
+{
+    var task = await ctx.TaskItems
+        .Include(t => t.Assignee)
+        .Include(t => t.Status)
+        .Where(t => t.Id == request.TaskId && t.DeletedAt == null)
+        .FirstOrDefaultAsync();
+
+    if (task == null)
+    {
+        throw new KeyNotFoundException("Task not found.");
+    }
+
+    var newStatus = await ctx.TodoTaskStatuses
+        .FirstOrDefaultAsync(s => s.Id == request.NewStatusId);
+
+    if (newStatus == null)
+    {
+        throw new KeyNotFoundException("New status not found.");
+    }
+
+    var user = await ctx.Users
+        .FirstOrDefaultAsync(u => u.Id == request.ChangedByUserId);
+
+    if (user == null)
+    {
+        throw new KeyNotFoundException("User who changes the task not found.");
+    }
+
+    var oldStatus = task.Status;
+
+    // Update task
+    task.StatusId = newStatus.Id;
+    task.Status = newStatus;
+    await ctx.SaveChangesAsync();
+
+    // Save history
+    var saveHistory = new SaveTaskToHistory(ctx);
+    await saveHistory.OnStatusChange(task, oldStatus.Id, newStatus.Id, user.Id);
+
+    return Ok(MapToTaskDto(task));
+}
+
     [HttpPost(nameof(CreateTask))]
     public async Task<ActionResult<TaskDto>> CreateTask([FromBody] CreateTaskRequest request)
     {
@@ -97,7 +149,6 @@ public class TaskController(MyDbContext ctx) : ControllerBase
                 return NotFound($"Assignee not found with id: '{request.AssigneeId}'");
             }
         }
-        
 
         var newTask = new TaskItem
         {
@@ -147,5 +198,64 @@ public class TaskController(MyDbContext ctx) : ControllerBase
                     Username = task.Assignee.Username
                 }
         };
+    }
+    [HttpPut(nameof(UpdateTask))]
+    public async Task<ActionResult<TaskDto>> UpdateTask([FromQuery] string id, [FromBody] UpdateTaskRequest request)
+    {
+        if (!Guid.TryParse(id, out var taskId))
+        {
+            return BadRequest("Invalid task id.");
+        }
+
+        var task = await ctx.TaskItems
+            .Include(t => t.Assignee)
+            .Include(t => t.Status)
+            .FirstOrDefaultAsync(t => t.Id == taskId && t.DeletedAt == null);
+
+        if (task == null)
+        {
+            return NotFound();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return BadRequest("Title is required.");
+        }
+
+        task.Title = request.Title.Trim();
+
+        if (request.AssigneeId != null && request.AssigneeId != task.AssigneeId)
+        {
+            var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == request.AssigneeId);
+            if (user == null)
+            {
+                return NotFound("User not found with id: " + request.AssigneeId);
+            }
+            task.AssigneeId = user.Id;
+            task.Assignee = user;
+        }
+
+        await ctx.SaveChangesAsync();
+
+        return Ok(MapToTaskDto(task));
+        }
+        
+    [HttpDelete(nameof(DeleteTask))]
+    public async Task<IActionResult> DeleteTask([FromQuery] string id)
+    {
+        if (!Guid.TryParse(id, out var taskId))
+            return BadRequest("Invalid task id.");
+
+        var task = await ctx.TaskItems
+            .FirstOrDefaultAsync(t => t.Id == taskId && t.DeletedAt == null);
+
+        if (task == null)
+            return NotFound();
+
+        task.DeletedAt = DateTime.UtcNow;
+
+        await ctx.SaveChangesAsync();
+
+        return NoContent(); // 204
     }
 }

@@ -24,4 +24,28 @@ public class SaveTaskToHistory(MyDbContext ctx)
         await ctx.TaskHistories.AddAsync(history);
         await ctx.SaveChangesAsync();
     }
+    
+    
+    public async Task OnStatusChange(TaskItem task, Guid fromStatusId, Guid toStatusId, Guid changedBy)
+    {
+        var userIdCheck = ctx.Users.Where(u => u.Id == changedBy)
+            .Select(u => u.Id)
+            .FirstOrDefault();
+        if (userIdCheck == Guid.Empty)
+        {
+            throw new Exception("User not found.");
+        }
+
+        var entry = new TaskHistory
+        {
+            TaskId = task.Id,
+            FromStatusId = fromStatusId,
+            ToStatusId = toStatusId,
+            ChangedBy = changedBy
+        };
+
+        ctx.TaskHistories.Add(entry);
+        await ctx.SaveChangesAsync();
+    }
+
 }

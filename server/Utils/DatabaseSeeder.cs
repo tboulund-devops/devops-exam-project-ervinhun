@@ -59,6 +59,7 @@ public static class DatabaseSeeder
                 new TodoTaskStatus { Name = "Backlog" },
                 new TodoTaskStatus { Name = "To-do" },
                 new TodoTaskStatus { Name = "Doing" },
+                new TodoTaskStatus { Name = "Review" },
                 new TodoTaskStatus { Name = "Done" }
             );
 
