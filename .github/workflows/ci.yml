@@ -23,7 +23,7 @@ jobs:
       - name: Install tools for coverage and stryker
         run: |
           dotnet tool install -g dotnet-reportgenerator-globaltool --version 5.3.9
-          dotnet tool install -g dotnet-stryker --version 4.0.0
+          dotnet tool install -g dotnet-stryker --version 4.13.0
 
       - name: Restore
         run: dotnet restore ./server/server.csproj
@@ -32,15 +32,15 @@ jobs:
         run: dotnet build ./server/server.csproj --no-restore --configuration Release
 
       - name: Run Stryker
-        working-directory: ./server
-        run: dotnet stryker --project server/server.csproj --test-project ../test/test.csproj
+        working-directory: ./
+        run: dotnet stryker --project ./server/server.csproj --test-project ./test/test.csproj --output-path ./StrykerOutput --baseline false
         
       - name: Upload coverage report (placeholder)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: server/StrykerOutput
+          path: StrykerOutput
 
       - name: Run Tests with Code Coverage
         run: dotnet test ./test/test.csproj --configuration Release --collect:"XPlat Code Coverage" --results-directory TestResults --logger "trx;LogFileName=test-results.trx"
