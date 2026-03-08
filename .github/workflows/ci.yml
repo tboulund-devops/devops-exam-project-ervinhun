@@ -39,7 +39,7 @@ jobs:
           --output ../StrykerOutput
           
         
-      - name: Upload coverage report (placeholder)
+      - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -47,7 +47,9 @@ jobs:
           path: StrykerOutput
 
       - name: Run Tests with Code Coverage
-        run: dotnet test ./test/test.csproj --configuration Release --collect:"XPlat Code Coverage" --results-directory TestResults --logger "trx;LogFileName=test-results.trx"
+        run: |
+          dotnet test ./test/test.csproj --configuration Release --collect:"XPlat Code Coverage" 
+          --results-directory TestResults --logger "trx;LogFileName=test-results.trx"
 
       - name: Generate Coverage Report
         run: reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage-report -reporttypes:Html
