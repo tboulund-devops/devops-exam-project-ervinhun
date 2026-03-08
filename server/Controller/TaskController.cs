@@ -126,7 +126,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
     [HttpPost(nameof(CreateTask))]
     public async Task<ActionResult<TaskDto>> CreateTask([FromBody] CreateTaskRequest request)
     {
-        var defaultStatus = await ctx.TodoTaskStatuses.Where(s => s.Name == "Backlog" && s.DeletedAt == null)
+        var defaultStatus = await ctx.TodoTaskStatuses.Where(s => s.Name == "Backlog")
             .FirstOrDefaultAsync();
         if (defaultStatus == null)
         {
@@ -134,6 +134,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             {
                 Name = "Backlog",
                 CreatedAt = DateTime.UtcNow,
+                DeletedAt = null
             };
             await ctx.TodoTaskStatuses.AddAsync(backlogStatus);
             await ctx.SaveChangesAsync();
