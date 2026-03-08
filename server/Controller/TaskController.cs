@@ -8,6 +8,7 @@ namespace server.Controller;
 
 [ApiController]
 [Route("api/tasks")]
+
 public class TaskController(MyDbContext ctx) : ControllerBase
 {
     
@@ -173,6 +174,47 @@ public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest req
                 }
         };
     }
+    [HttpPut(nameof(UpdateTask))]
+    public async Task<ActionResult<TaskDto>> UpdateTask([FromQuery] string id, [FromBody] UpdateTaskRequest request)
+    {
+        if (!Guid.TryParse(id, out var taskId))
+        {
+            return BadRequest("Invalid task id.");
+        }
+
+        var task = await ctx.TaskItems
+            .Include(t => t.Assignee)
+            .Include(t => t.Status)
+            .FirstOrDefaultAsync(t => t.Id == taskId && t.DeletedAt == null);
+
+        if (task == null)
+        {
+            return NotFound();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return BadRequest("Title is required.");
+        }
+
+        task.Title = request.Title.Trim();
+
+        if (request.AssigneeId != null && request.AssigneeId != task.AssigneeId)
+        {
+            var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == request.AssigneeId);
+            if (user == null)
+            {
+                return NotFound("User not found with id: " + request.AssigneeId);
+            }
+            task.AssigneeId = user.Id;
+            task.Assignee = user;
+        }
+
+        await ctx.SaveChangesAsync();
+
+        return Ok(MapToTaskDto(task));
+        }
+        
     [HttpDelete(nameof(DeleteTask))]
     public async Task<IActionResult> DeleteTask([FromQuery] string id)
     {
