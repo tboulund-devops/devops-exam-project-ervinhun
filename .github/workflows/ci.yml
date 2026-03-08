@@ -33,10 +33,7 @@ jobs:
 
       - name: Run Stryker
         working-directory: ./server
-        run: |
-          dotnet stryker --project server.csproj
-          --test-project ../test/test.csproj
-          --output ../StrykerOutput
+        run: dotnet stryker --project server.csproj --test-project ../test/test.csproj --output ../StrykerOutput
           
         
       - name: Upload coverage report
@@ -47,9 +44,7 @@ jobs:
           path: StrykerOutput
 
       - name: Run Tests with Code Coverage
-        run: |
-          dotnet test ./test/test.csproj --configuration Release --collect:"XPlat Code Coverage" 
-          --results-directory TestResults --logger "trx;LogFileName=test-results.trx"
+        run: dotnet test ./test/test.csproj --configuration Release --collect:"XPlat Code Coverage" --results-directory TestResults --logger "trx;LogFileName=test-results.trx"
 
       - name: Generate Coverage Report
         run: reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage-report -reporttypes:Html
