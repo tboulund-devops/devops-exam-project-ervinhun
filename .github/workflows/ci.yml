@@ -33,7 +33,10 @@ jobs:
 
       - name: Run Stryker
         working-directory: ./
-        run: dotnet stryker --project ./server/server.csproj --test-project ./test/test.csproj --output-path ./StrykerOutput --baseline false
+        run: |
+          dotnet stryker --project ./server/server.csproj 
+          --test-project ./test/test.csproj 
+          --output ./StrykerOutput
         
       - name: Upload coverage report (placeholder)
         if: always()
