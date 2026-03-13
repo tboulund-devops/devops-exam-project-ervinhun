@@ -32,5 +32,7 @@ public partial class TaskItem
 
     public virtual ICollection<TaskComment> TaskComments { get; set; } = new List<TaskComment>();
 
+    public virtual ICollection<TaskDetailHistory> TaskDetailHistories { get; set; } = new List<TaskDetailHistory>();
+
     public virtual ICollection<TaskHistory> TaskHistories { get; set; } = new List<TaskHistory>();
 }
