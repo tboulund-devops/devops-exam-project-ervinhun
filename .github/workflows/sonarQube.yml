@@ -86,6 +86,17 @@ jobs:
       - name: Build
         run: dotnet build server/server.csproj --no-restore -c Release
 
+      - name: Test with coverage
+        run: dotnet test server/server.csproj --collect:"XPlat Code Coverage"
+
+      - name: Generate SonarQube coverage report
+        run: |
+          mkdir -p coverage-report
+          ./.tools/reportgenerator \
+            "-reports:**/coverage.cobertura.xml" \
+            "-targetdir:coverage-report" \
+            "-reporttypes:SonarQube"
+
       # ---------------- SONAR END ----------------
       - name: Complete SonarQube Analysis
         if: env.SONAR_ENABLED == 'true'

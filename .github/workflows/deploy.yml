@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Application version
         id: semver-app
@@ -54,7 +56,7 @@ jobs:
           generateReleaseNotes: true
           body: |
             - Version: ${{ steps.semver-app.outputs.version }}
-            - Commit: ${{ github.sha }}
+            - Commit: ${{ github.event.workflow_run.head_sha }}
             - This release includes the following container image:
             https://ghcr.io/${{ github.repository }}:${{ steps.semver-app.outputs.version }}
 

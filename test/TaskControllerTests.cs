@@ -283,7 +283,7 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
     }
 
     [Fact]
-    [DisplayName("DeleteTask called twice returns NotFound second time and does not duplicate delete history")]
+    [DisplayName("DeleteTask called twice returns BadRequest second time and does not duplicate delete history")]
     public async Task DeleteTask_Twice_NoDuplicateDeleteHistory()
     {
         var createdTask = await CreateTaskOrThrow("Delete twice", "Delete twice test");

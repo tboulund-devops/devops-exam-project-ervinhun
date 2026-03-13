@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using server.DataAccess;
 using Testcontainers.PostgreSql;
+using System.IO;
 
 namespace test;
 
@@ -58,9 +59,31 @@ public class CustomWebApplicationFactory : WebApplicationFactory<server.Program>
             using var scope = serviceProvider.CreateScope();
             var scopedServices = scope.ServiceProvider;
             var db = scopedServices.GetRequiredService<MyDbContext>();
-            db.Database.EnsureCreated();
+            ApplyDatabaseSchema(db);
 
             TestDataSeeder.SeedBaseData(db);
         });
+    }
+
+    private static void ApplyDatabaseSchema(MyDbContext db)
+    {
+        // Prefer applying the same schema.sql used in production so that tests
+        // see the same triggers, functions, indexes, etc. If schema.sql is not
+        // available, fall back to EnsureCreated() to preserve existing behavior.
+        var baseDirectory = AppContext.BaseDirectory;
+        var schemaPath = Path.Combine(baseDirectory, "schema.sql");
+
+        if (File.Exists(schemaPath))
+        {
+            var sql = File.ReadAllText(schemaPath);
+            if (!string.IsNullOrWhiteSpace(sql))
+            {
+                db.Database.ExecuteSqlRaw(sql);
+            }
+        }
+        else
+        {
+            db.Database.EnsureCreated();
+        }
     }
 }
