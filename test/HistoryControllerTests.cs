@@ -16,7 +16,7 @@ public class HistoryControllerTests(CustomWebApplicationFactory factory) : IClas
     [DisplayName("GetTaskHistory returns entries ordered by ChangedAt ascending")]
     public async Task GetTaskHistory_ReturnsOrderedEntries()
     {
-        var (taskId, systemUserId, fromStatusId, toStatusId) = await SeedHistoryRow();
+        var seeded = await SeedTaskHistoryRows();
 
         var response = await _client.GetAsync("/api/History/GetTaskHistory");
         response.IsSuccessStatusCode.Should().BeTrue();
@@ -24,18 +24,22 @@ public class HistoryControllerTests(CustomWebApplicationFactory factory) : IClas
         var payload = await response.Content.ReadFromJsonAsync<List<TaskHistory>>();
         payload.Should().NotBeNull();
         payload!.Should().BeInAscendingOrder(x => x.ChangedAt);
-        payload.Should().Contain(h =>
-            h.TaskId == taskId &&
-            h.ChangedBy == systemUserId &&
-            h.FromStatusId == fromStatusId &&
-            h.ToStatusId == toStatusId);
+
+        var taskEntries = payload
+            .Where(h => h.TaskId == seeded.TaskId)
+            .OrderBy(h => h.ChangedAt)
+            .ToList();
+
+        taskEntries.Count.Should().BeGreaterThanOrEqualTo(2);
+        taskEntries.Select(h => h.Id).Should().ContainInOrder(seeded.OlderEntryId, seeded.NewerEntryId);
+        taskEntries.Should().Contain(h => h.ChangedBy == seeded.SystemUserId);
     }
 
     [Fact]
     [DisplayName("GetTaskDetailHistory returns entries ordered by ChangedAt ascending")]
     public async Task GetTaskDetailHistory_ReturnsOrderedEntries()
     {
-        var taskId = await SeedDetailHistoryRow();
+        var seeded = await SeedTaskDetailHistoryRows();
 
         var response = await _client.GetAsync("/api/History/GetTaskDetailHistory");
         response.IsSuccessStatusCode.Should().BeTrue();
@@ -43,11 +47,15 @@ public class HistoryControllerTests(CustomWebApplicationFactory factory) : IClas
         var payload = await response.Content.ReadFromJsonAsync<List<TaskDetailHistory>>();
         payload.Should().NotBeNull();
         payload!.Should().BeInAscendingOrder(x => x.ChangedAt);
-        payload.Should().Contain(h =>
-            h.TaskId == taskId &&
-            h.FieldName == "Title" &&
-            h.OldValue == "old-value" &&
-            h.NewValue == "new-value");
+
+        var taskEntries = payload
+            .Where(h => h.TaskId == seeded.TaskId)
+            .OrderBy(h => h.ChangedAt)
+            .ToList();
+
+        taskEntries.Count.Should().BeGreaterThanOrEqualTo(2);
+        taskEntries.Select(h => h.Id).Should().ContainInOrder(seeded.OlderEntryId, seeded.NewerEntryId);
+        taskEntries.Select(h => h.FieldName).Should().Contain(new[] { "Title", "Description" });
     }
 
     [Fact]
@@ -57,7 +65,7 @@ public class HistoryControllerTests(CustomWebApplicationFactory factory) : IClas
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    private async Task<(Guid taskId, Guid systemUserId, Guid fromStatusId, Guid toStatusId)> SeedHistoryRow()
+    private async Task<(Guid TaskId, Guid SystemUserId, Guid OlderEntryId, Guid NewerEntryId)> SeedTaskHistoryRows()
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
@@ -76,20 +84,33 @@ public class HistoryControllerTests(CustomWebApplicationFactory factory) : IClas
         await db.TaskItems.AddAsync(task);
         await db.SaveChangesAsync();
 
-        await db.TaskHistories.AddAsync(new TaskHistory
+        var newerEntry = new TaskHistory
         {
             TaskId = task.Id,
             FromStatusId = fromStatusId,
             ToStatusId = toStatusId,
             ChangedBy = systemUserId,
+            ChangedAt = DateTime.UtcNow.AddMinutes(-1)
+        };
+
+        var olderEntry = new TaskHistory
+        {
+            TaskId = task.Id,
+            FromStatusId = toStatusId,
+            ToStatusId = fromStatusId,
+            ChangedBy = systemUserId,
             ChangedAt = DateTime.UtcNow.AddMinutes(-2)
-        });
+        };
+
+        // Insert in reverse timestamp order to prove endpoint sorting is based on ChangedAt.
+        await db.TaskHistories.AddAsync(newerEntry);
+        await db.TaskHistories.AddAsync(olderEntry);
         await db.SaveChangesAsync();
 
-        return (task.Id, systemUserId, fromStatusId, toStatusId);
+        return (task.Id, systemUserId, olderEntry.Id, newerEntry.Id);
     }
 
-    private async Task<Guid> SeedDetailHistoryRow()
+    private async Task<(Guid TaskId, Guid OlderEntryId, Guid NewerEntryId)> SeedTaskDetailHistoryRows()
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
@@ -107,18 +128,32 @@ public class HistoryControllerTests(CustomWebApplicationFactory factory) : IClas
         await db.TaskItems.AddAsync(task);
         await db.SaveChangesAsync();
 
-        await db.TaskDetailHistories.AddAsync(new TaskDetailHistory
+        var newerEntry = new TaskDetailHistory
+        {
+            TaskId = task.Id,
+            FieldName = "Description",
+            OldValue = "old-description",
+            NewValue = "new-description",
+            ChangedBy = systemUserId,
+            ChangedAt = DateTime.UtcNow.AddMinutes(-1)
+        };
+
+        var olderEntry = new TaskDetailHistory
         {
             TaskId = task.Id,
             FieldName = "Title",
-            OldValue = "old-value",
-            NewValue = "new-value",
+            OldValue = "old-title",
+            NewValue = "new-title",
             ChangedBy = systemUserId,
-            ChangedAt = DateTime.UtcNow.AddMinutes(-1)
-        });
+            ChangedAt = DateTime.UtcNow.AddMinutes(-2)
+        };
+
+        // Insert in reverse timestamp order to prove endpoint sorting is based on ChangedAt.
+        await db.TaskDetailHistories.AddAsync(newerEntry);
+        await db.TaskDetailHistories.AddAsync(olderEntry);
         await db.SaveChangesAsync();
 
-        return task.Id;
+        return (task.Id, olderEntry.Id, newerEntry.Id);
     }
 
     private static async Task<Guid> EnsureStatus(MyDbContext db, string name)

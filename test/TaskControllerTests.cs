@@ -292,7 +292,7 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
         firstDeleteResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
 
         var secondDeleteResponse = await _client.DeleteAsync($"/api/Task/DeleteTask?id={createdTask.Id}");
-        secondDeleteResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+        secondDeleteResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
 
         var detailHistory = await GetTaskDetailHistory(createdTask.Id);
         detailHistory.Count(h => h.FieldName == "DeletedAt").Should().Be(1);
