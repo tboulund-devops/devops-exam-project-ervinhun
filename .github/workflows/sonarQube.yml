@@ -79,7 +79,8 @@ jobs:
             /d:sonar.scanner.scanAll=false \
             /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml"
 
-      # ---------------- BUILD ----------------
+      # ---------------- BUILD & TEST ----------------
+      # These must run regardless, but coverage is only useful if Sonar started
       - name: Restore
         run: dotnet restore server/server.csproj
 
@@ -87,9 +88,10 @@ jobs:
         run: dotnet build server/server.csproj --no-restore -c Release
 
       - name: Test with coverage
-        run: dotnet test server/server.csproj --collect:"XPlat Code Coverage"
+        run: dotnet test server/server.csproj --no-build -c Release --collect:"XPlat Code Coverage"
 
       - name: Generate SonarQube coverage report
+        if: env.SONAR_ENABLED == 'true'
         run: |
           mkdir -p coverage-report
           ./.tools/reportgenerator \
@@ -100,5 +102,7 @@ jobs:
       # ---------------- SONAR END ----------------
       - name: Complete SonarQube Analysis
         if: env.SONAR_ENABLED == 'true'
+        # Use continue-on-error if you don't want a Sonar failure to break the whole CI pipeline
+        continue-on-error: false
         run: |
           ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
