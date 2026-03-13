@@ -233,11 +233,16 @@ public class TaskController(MyDbContext ctx) : ControllerBase
 
         if (task == null)
             return NotFound();
+        
+        if (task.DeletedAt != null)
+            return BadRequest("Task is already deleted.");
 
         task.DeletedAt = DateTime.UtcNow;
 
         await ctx.SaveChangesAsync();
-
+        var saveHistory = new SaveTaskToHistory(ctx);
+        var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
+        await saveHistory.OnDelete(task.Id, systemUser.Id, task.DeletedAt.Value);
         return NoContent(); // 204
     }
 

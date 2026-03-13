@@ -108,4 +108,20 @@ public class SaveTaskToHistory(MyDbContext ctx)
         return userIdCheck;
     }
 
+    public async Task OnDelete(Guid taskId, Guid systemUserId, DateTime deletedAt)
+    {
+        await UserIdCheck(systemUserId);
+
+        var entry = new TaskDetailHistory
+        {
+            TaskId = taskId,
+            FieldName = "DeletedAt",
+            OldValue = null,
+            NewValue = deletedAt.ToString("o"),
+            ChangedBy = systemUserId,
+            ChangedAt = DateTime.UtcNow
+        };
+        ctx.TaskDetailHistories.Add(entry);
+        await ctx.SaveChangesAsync();
+    }
 }
