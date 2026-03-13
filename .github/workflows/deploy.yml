@@ -2,7 +2,7 @@ name: Deploy to production
 
 on:
   workflow_run:
-    workflows: ["CI", "SonarQube Analysis"]
+    workflows: ["SonarQube Analysis"]
     types: [completed]
     branches:
       - main
@@ -42,7 +42,7 @@ jobs:
           docker build \
               -t ghcr.io/${{ github.repository }}:staging \
               -t ghcr.io/${{ github.repository }}:${{ steps.semver-app.outputs.version }} \
-              -f DevOpsWebApplication/Dockerfile \
+              -f Dockerfile \
               .
           docker push ghcr.io/${{ github.repository }} --all-tags
 
@@ -64,7 +64,7 @@ jobs:
           host: ${{ vars.STAGING_SERVER_IP }}
           username: ${{ vars.STAGING_SERVER_USERNAME }}
           key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
-          source: DevOpsWebApplication/compose.yml
+          source: compose.yml
           target: ~/dowa/
 
       - name: Run Docker Compose on staging server
@@ -74,6 +74,6 @@ jobs:
           username: ${{ vars.STAGING_SERVER_USERNAME }}
           key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
           script: |
-            cd ~/dowa/DevOpsWebApplication
+            cd ~/dowa
             docker compose pull
             docker compose up -d

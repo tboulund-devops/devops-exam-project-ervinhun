@@ -54,7 +54,7 @@ jobs:
         if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
         run: |
           mkdir -p ./.sonar/scanner
-          dotnet tool update dotnet-sonarscanner --tool-path ./.sonar/scanner    
+          dotnet tool update dotnet-sonarscanner --tool-path ./.sonar/scanner || dotnet tool install dotnet-sonarscanner --tool-path ./.sonar/scanner
           
       - name: Cache SonarQube packages
         uses: actions/cache@v4
@@ -66,7 +66,7 @@ jobs:
       - name: Install reportgenerator
         run: |
           mkdir -p ./.tools
-          dotnet tool update dotnet-reportgenerator-globaltool --tool-path ./.tools
+          dotnet tool update dotnet-reportgenerator-globaltool --tool-path ./.tools || dotnet tool install dotnet-reportgenerator-globaltool --tool-path ./.tools
 
       # ---------------- SONAR BEGIN ----------------
       - name: Start SonarQube Analysis

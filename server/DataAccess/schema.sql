@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE INDEX IF NOT EXISTS idx_task_item_status_id ON task_item(status_id);
 CREATE INDEX IF NOT EXISTS idx_task_item_assignee_id ON task_item(assignee_id);
 CREATE INDEX IF NOT EXISTS idx_task_history_task_id ON task_history(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_detail_history_task_id_changed_at ON task_detail_history(task_id, changed_at);
 CREATE INDEX IF NOT EXISTS idx_task_comments_task_id ON task_comments(task_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 
