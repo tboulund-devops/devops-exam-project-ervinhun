@@ -63,7 +63,7 @@ public class SaveTaskToHistory(MyDbContext ctx)
         if (oldTask.AssigneeId != updateRequest.AssigneeId)
         {
             if (updateRequest.AssigneeId != null)
-                UserIdCheck(updateRequest.AssigneeId ?? Guid.Empty).Wait();
+                await UserIdCheck(updateRequest.AssigneeId ?? Guid.Empty);
             var entry = new TaskDetailHistory()
             {
                 TaskId = oldTask.Id,
@@ -82,7 +82,7 @@ public class SaveTaskToHistory(MyDbContext ctx)
     
     public async Task OnStatusChange(TaskItem task, Guid fromStatusId, Guid toStatusId, Guid changedBy)
     {
-        UserIdCheck(changedBy).Wait();
+        await UserIdCheck(changedBy);
 
         var entry = new TaskHistory
         {

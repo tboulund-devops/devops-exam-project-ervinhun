@@ -206,7 +206,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
 
         if (request.AssigneeId != null && request.AssigneeId != task.AssigneeId)
         {
-            var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == request.AssigneeId);
+            var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == request.AssigneeId && u.DeletedAt == null);
             if (user == null)
             {
                 return NotFound("User not found with id: " + request.AssigneeId);
@@ -229,7 +229,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             return BadRequest("Invalid task id.");
 
         var task = await ctx.TaskItems
-            .FirstOrDefaultAsync(t => t.Id == taskId && t.DeletedAt == null);
+            .FirstOrDefaultAsync(t => t.Id == taskId);
 
         if (task == null)
             return NotFound();
@@ -254,6 +254,8 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             Title = task.Title,
             Description = task.Description,
             CreatedAt = task.CreatedAt,
+            UpdatedAt = task.UpdatedAt,
+            DeletedAt = task.DeletedAt,
             Status = task.Status.Name,
             Assignee = task.Assignee == null
                 ? null
