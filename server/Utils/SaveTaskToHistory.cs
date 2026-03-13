@@ -63,7 +63,9 @@ public class SaveTaskToHistory(MyDbContext ctx)
         if (oldTask.AssigneeId != updateRequest.AssigneeId)
         {
             if (updateRequest.AssigneeId != null)
-                await UserIdCheck(updateRequest.AssigneeId ?? Guid.Empty);
+            {
+                await UserIdCheck(updateRequest.AssigneeId.Value);
+            }
             var entry = new TaskDetailHistory()
             {
                 TaskId = oldTask.Id,
