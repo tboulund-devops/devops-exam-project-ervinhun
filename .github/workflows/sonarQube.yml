@@ -82,13 +82,13 @@ jobs:
       # ---------------- BUILD & TEST ----------------
       # These must run regardless, but coverage is only useful if Sonar started
       - name: Restore
-        run: dotnet restore server/server.csproj
+        run: dotnet restore test/test.csproj
 
       - name: Build
-        run: dotnet build server/server.csproj --no-restore -c Release
+        run: dotnet build test/test.csproj --no-restore -c Release
 
       - name: Test with coverage
-        run: dotnet test server/server.csproj --no-build -c Release --collect:"XPlat Code Coverage"
+        run: dotnet test test/test.csproj --no-build -c Release --collect:"XPlat Code Coverage"
 
       - name: Generate SonarQube coverage report
         if: env.SONAR_ENABLED == 'true'

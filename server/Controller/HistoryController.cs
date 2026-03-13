@@ -23,7 +23,7 @@ public class HistoryController(MyDbContext ctx) : ControllerBase
     private const int MaxPageSize = 500;
 
     [HttpGet(nameof(GetTaskHistory))]
-    public async Task<ActionResult<List<TaskHistoryDto>>> GetTaskHistory([FromQuery] int? pageNumber = null, [FromQuery] int? pageSize = null)
+    public async Task<ActionResult<List<TaskHistory>>> GetTaskHistory([FromQuery] int? pageNumber = null, [FromQuery] int? pageSize = null)
     {
         var query = ctx.TaskHistories
             .AsNoTracking()
@@ -39,16 +39,12 @@ public class HistoryController(MyDbContext ctx) : ControllerBase
         }
 
         var result = await query
-            .Select(t => new TaskHistoryDto
-            {
-                ChangedAt = t.ChangedAt
-            })
             .ToListAsync();
         return Ok(result);
     }
 
     [HttpGet(nameof(GetTaskDetailHistory))]
-    public async Task<ActionResult<List<TaskDetailHistoryDto>>> GetTaskDetailHistory([FromQuery] int? pageNumber = null, [FromQuery] int? pageSize = null)
+    public async Task<ActionResult<List<TaskDetailHistory>>> GetTaskDetailHistory([FromQuery] int? pageNumber = null, [FromQuery] int? pageSize = null)
     {
         var query = ctx.TaskDetailHistories
             .AsNoTracking()
@@ -64,10 +60,6 @@ public class HistoryController(MyDbContext ctx) : ControllerBase
         }
 
         var result = await query
-            .Select(t => new TaskDetailHistoryDto
-            {
-                ChangedAt = t.ChangedAt
-            })
             .ToListAsync();
         return Ok(result);
     }

@@ -204,21 +204,31 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         task.Title = request.Title.Trim();
         task.Description = request.Description?.Trim();
 
-        if (request.AssigneeId != null && request.AssigneeId != task.AssigneeId)
+        if (request.AssigneeId.HasValue)
         {
-            var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == request.AssigneeId && u.DeletedAt == null);
-            if (user == null)
+            // Only change the assignee if the client explicitly provided a value.
+            // Guid.Empty is treated as an explicit "unassign" request.
+            if (request.AssigneeId == task.AssigneeId)
             {
-                return NotFound("User not found with id: " + request.AssigneeId);
+                // No change in assignee requested.
             }
-            task.AssigneeId = request.AssigneeId;
-            task.Assignee = user;
-        }
-
-        if (request.AssigneeId == null)
-        {
-            task.AssigneeId = null;
-            task.Assignee = null;
+            else if (request.AssigneeId == Guid.Empty)
+            {
+                // Explicitly unassign the task.
+                task.AssigneeId = null;
+                task.Assignee = null;
+            }
+            else
+            {
+                var user = await ctx.Users
+                    .FirstOrDefaultAsync(u => u.Id == request.AssigneeId && u.DeletedAt == null);
+                if (user == null)
+                {
+                    return NotFound("User not found with id: " + request.AssigneeId);
+                }
+                task.AssigneeId = request.AssigneeId;
+                task.Assignee = user;
+            }
         }
 
         await ctx.SaveChangesAsync();
@@ -275,7 +285,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
 
     private async Task<User> GetSystemUserBeforeWeImplementAuthentication()
     {
-        var systemUser = await ctx.Users.FirstOrDefaultAsync(u => u.Username == "system");
+        var systemUser = await ctx.Users.FirstOrDefaultAsync(u => u.Username == "system" && u.DeletedAt == null);
         return systemUser ?? throw new KeyNotFoundException("System user not found.");
     }
 }

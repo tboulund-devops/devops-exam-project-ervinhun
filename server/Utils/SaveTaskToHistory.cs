@@ -98,16 +98,13 @@ public class SaveTaskToHistory(MyDbContext ctx)
         await ctx.SaveChangesAsync();
     }
 
-    private async Task<Guid> UserIdCheck(Guid userId)
+    private async Task UserIdCheck(Guid userId)
     {
-        var userIdCheck = await ctx.Users.Where(u => u.Id == userId)
-            .Select(u => u.Id)
-            .FirstOrDefaultAsync();
-        if (userIdCheck == Guid.Empty)
+        var userExists = await ctx.Users.AnyAsync(u => u.Id == userId);
+        if (!userExists)
         {
             throw new KeyNotFoundException("User not found.");
         }
-        return userIdCheck;
     }
 
     public async Task OnDelete(Guid taskId, Guid systemUserId, DateTime deletedAt)
