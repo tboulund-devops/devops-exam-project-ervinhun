@@ -35,10 +35,20 @@ CREATE TABLE IF NOT EXISTS task_item (
     );
 
 CREATE TABLE IF NOT EXISTS task_history (
-                                            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     task_id UUID NOT NULL REFERENCES task_item(id) ON DELETE CASCADE,
     from_status_id UUID REFERENCES todo_task_status(id) ON DELETE SET NULL,
     to_status_id UUID REFERENCES todo_task_status(id) ON DELETE SET NULL,
+    changed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+CREATE TABLE IF NOT EXISTS task_detail_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    task_id UUID NOT NULL REFERENCES task_item(id) ON DELETE CASCADE,
+    field_name TEXT NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
     changed_by UUID REFERENCES users(id) ON DELETE SET NULL,
     changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );

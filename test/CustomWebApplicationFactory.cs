@@ -59,6 +59,17 @@ public class CustomWebApplicationFactory : WebApplicationFactory<server.Program>
             var scopedServices = scope.ServiceProvider;
             var db = scopedServices.GetRequiredService<MyDbContext>();
             db.Database.EnsureCreated();
+
+            // Tests rely on this user when recording task history.
+            if (!db.Users.Any(u => u.Username == "system"))
+            {
+                db.Users.Add(new User
+                {
+                    Username = "system",
+                    Email = "system@test.local"
+                });
+                db.SaveChanges();
+            }
         });
     }
 }

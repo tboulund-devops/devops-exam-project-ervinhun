@@ -1,0 +1,79 @@
+name: Deploy to production
+
+on:
+  workflow_run:
+    workflows: ["CI", "SonarQube Analysis"]
+    types: [completed]
+    branches:
+      - main
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  delivery:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.name == 'SonarQube Analysis' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Application version
+        id: semver-app
+        uses: paulhatch/semantic-version@v5.4.0
+        with:
+          bump_each_commit: true
+
+      - name: Echo version
+        run: |
+          echo "Version: ${{ steps.semver-app.outputs.version }}"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        run: |
+          docker build \
+              -t ghcr.io/${{ github.repository }}:staging \
+              -t ghcr.io/${{ github.repository }}:${{ steps.semver-app.outputs.version }} \
+              -f DevOpsWebApplication/Dockerfile \
+              .
+          docker push ghcr.io/${{ github.repository }} --all-tags
+
+      - name: Create release notes
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.semver-app.outputs.version }}
+          name: Release ${{ steps.semver-app.outputs.version }}
+          generateReleaseNotes: true
+          body: |
+            - Version: ${{ steps.semver-app.outputs.version }}
+            - Commit: ${{ github.sha }}
+            - This release includes the following container image:
+            https://ghcr.io/${{ github.repository }}:${{ steps.semver-app.outputs.version }}
+
+      - name: Deliver Docker Compose file to staging
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ vars.STAGING_SERVER_IP }}
+          username: ${{ vars.STAGING_SERVER_USERNAME }}
+          key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
+          source: DevOpsWebApplication/compose.yml
+          target: ~/dowa/
+
+      - name: Run Docker Compose on staging server
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ vars.STAGING_SERVER_IP }}
+          username: ${{ vars.STAGING_SERVER_USERNAME }}
+          key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
+          script: |
+            cd ~/dowa/DevOpsWebApplication
+            docker compose pull
+            docker compose up -d

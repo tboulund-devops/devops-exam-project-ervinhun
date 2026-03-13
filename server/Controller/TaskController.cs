@@ -24,12 +24,15 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             .Include(t => t.Assignee)
             .Include(t => t.Status)
             .Where(t => t.DeletedAt == null)
+            .OrderBy(t => t.CreatedAt)
             .Select(t => new TaskDto
             {
                 Id = t.Id,
                 Title = t.Title,
                 Description = t.Description,
                 CreatedAt = t.CreatedAt,
+                UpdatedAt = t.UpdatedAt,
+                DeletedAt = t.DeletedAt,
                 Status = t.Status.Name,
                 Assignee = t.Assignee == null
                     ? null
@@ -101,14 +104,6 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             throw new KeyNotFoundException("New status not found.");
         }
 
-        var user = await ctx.Users
-            .FirstOrDefaultAsync(u => u.Id == request.ChangedByUserId);
-
-        if (user == null)
-        {
-            throw new KeyNotFoundException("User who changes the task not found.");
-        }
-
         var oldStatus = task.Status;
 
         // Update task
@@ -118,7 +113,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
 
         // Save history
         var saveHistory = new SaveTaskToHistory(ctx);
-        await saveHistory.OnStatusChange(task, oldStatus.Id, newStatus.Id, user.Id);
+        await saveHistory.OnStatusChange(task, oldStatus.Id, newStatus.Id, request.ChangedByUserId);
 
         return Ok(MapToTaskDto(task));
     }
@@ -162,25 +157,88 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         };
 
         //For the history set the uploading user for 'system' at the moment, as we don't have auth yet
-        var systemUser = await ctx.Users.FirstOrDefaultAsync(u => u.Username == "system");
-        if (systemUser == null)
-        {
-            var addSystemUser = new User
-            {
-                Username = "system",
-                Email = "no-reply@system.com",
-                CreatedAt = DateTime.UtcNow,
-            };
-            await ctx.Users.AddAsync(addSystemUser);
-            await ctx.SaveChangesAsync();
-            systemUser = addSystemUser;
-        }
 
+        var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
         await ctx.TaskItems.AddAsync(newTask);
         await ctx.SaveChangesAsync();
         var saveHistory = new SaveTaskToHistory(ctx);
         await saveHistory.OnCreate(newTask, systemUser.Id);
         return CreatedAtAction(nameof(GetTaskById), new { id = newTask.Id }, MapToTaskDto(newTask));
+    }
+
+    [HttpPut(nameof(UpdateTask))]
+    public async Task<ActionResult<TaskDto>> UpdateTask([FromQuery] string id, [FromBody] UpdateTaskRequest request)
+    {
+        if (!Guid.TryParse(id, out var taskId))
+        {
+            return BadRequest("Invalid task id.");
+        }
+
+        var task = await ctx.TaskItems
+            .Include(t => t.Assignee)
+            .Include(t => t.Status)
+            .FirstOrDefaultAsync(t => t.Id == taskId && t.DeletedAt == null);
+
+        if (task == null)
+        {
+            return NotFound();
+        }
+
+        var oldTask = new TaskItem()
+        {
+            Id = task.Id,
+            Title = task.Title,
+            Description = task.Description,
+            StatusId = task.StatusId,
+            AssigneeId = task.AssigneeId,
+            DueDate = task.DueDate,
+            CreatedAt = task.CreatedAt,
+            UpdatedAt = task.UpdatedAt,
+            DeletedAt = task.DeletedAt,
+        };
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return BadRequest("Title is required.");
+        }
+
+        task.Title = request.Title.Trim();
+        task.Description = request.Description?.Trim();
+
+        if (request.AssigneeId != null && request.AssigneeId != task.AssigneeId)
+        {
+            var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == request.AssigneeId);
+            if (user == null)
+            {
+                return NotFound("User not found with id: " + request.AssigneeId);
+            }
+
+            task.AssigneeId = user.Id;
+        }
+
+        await ctx.SaveChangesAsync();
+        var saveHistory = new SaveTaskToHistory(ctx);
+        var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
+        await saveHistory.OnUpdate(oldTask, request, systemUser.Id);
+        return Ok(MapToTaskDto(task));
+    }
+
+    [HttpDelete(nameof(DeleteTask))]
+    public async Task<IActionResult> DeleteTask([FromQuery] string id)
+    {
+        if (!Guid.TryParse(id, out var taskId))
+            return BadRequest("Invalid task id.");
+
+        var task = await ctx.TaskItems
+            .FirstOrDefaultAsync(t => t.Id == taskId && t.DeletedAt == null);
+
+        if (task == null)
+            return NotFound();
+
+        task.DeletedAt = DateTime.UtcNow;
+
+        await ctx.SaveChangesAsync();
+
+        return NoContent(); // 204
     }
 
     private TaskDto MapToTaskDto(TaskItem task)
@@ -202,64 +260,9 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         };
     }
 
-    [HttpPut(nameof(UpdateTask))]
-    public async Task<ActionResult<TaskDto>> UpdateTask([FromQuery] string id, [FromBody] UpdateTaskRequest request)
+    private async Task<User> GetSystemUserBeforeWeImplementAuthentication()
     {
-        if (!Guid.TryParse(id, out var taskId))
-        {
-            return BadRequest("Invalid task id.");
-        }
-
-        var task = await ctx.TaskItems
-            .Include(t => t.Assignee)
-            .Include(t => t.Status)
-            .FirstOrDefaultAsync(t => t.Id == taskId && t.DeletedAt == null);
-
-        if (task == null)
-        {
-            return NotFound();
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Title))
-        {
-            return BadRequest("Title is required.");
-        }
-
-        task.Title = request.Title.Trim();
-
-        if (request.AssigneeId != null && request.AssigneeId != task.AssigneeId)
-        {
-            var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == request.AssigneeId);
-            if (user == null)
-            {
-                return NotFound("User not found with id: " + request.AssigneeId);
-            }
-
-            task.AssigneeId = user.Id;
-            task.Assignee = user;
-        }
-
-        await ctx.SaveChangesAsync();
-
-        return Ok(MapToTaskDto(task));
-    }
-
-    [HttpDelete(nameof(DeleteTask))]
-    public async Task<IActionResult> DeleteTask([FromQuery] string id)
-    {
-        if (!Guid.TryParse(id, out var taskId))
-            return BadRequest("Invalid task id.");
-
-        var task = await ctx.TaskItems
-            .FirstOrDefaultAsync(t => t.Id == taskId && t.DeletedAt == null);
-
-        if (task == null)
-            return NotFound();
-
-        task.DeletedAt = DateTime.UtcNow;
-
-        await ctx.SaveChangesAsync();
-
-        return NoContent(); // 204
+        var systemUser = await ctx.Users.FirstOrDefaultAsync(u => u.Username == "system");
+        return systemUser ?? throw new KeyNotFoundException("System user not found.");
     }
 }

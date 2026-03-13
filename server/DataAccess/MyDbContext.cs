@@ -15,6 +15,8 @@ public partial class MyDbContext : DbContext
 
     public virtual DbSet<TaskComment> TaskComments { get; set; }
 
+    public virtual DbSet<TaskDetailHistory> TaskDetailHistories { get; set; }
+
     public virtual DbSet<TaskHistory> TaskHistories { get; set; }
 
     public virtual DbSet<TaskItem> TaskItems { get; set; }
@@ -77,6 +79,34 @@ public partial class MyDbContext : DbContext
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("task_comments_user_id_fkey");
+        });
+
+        modelBuilder.Entity<TaskDetailHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("task_detail_history_pkey");
+
+            entity.ToTable("task_detail_history");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("gen_random_uuid()")
+                .HasColumnName("id");
+            entity.Property(e => e.ChangedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("changed_at");
+            entity.Property(e => e.ChangedBy).HasColumnName("changed_by");
+            entity.Property(e => e.FieldName).HasColumnName("field_name");
+            entity.Property(e => e.NewValue).HasColumnName("new_value");
+            entity.Property(e => e.OldValue).HasColumnName("old_value");
+            entity.Property(e => e.TaskId).HasColumnName("task_id");
+
+            entity.HasOne(d => d.ChangedByNavigation).WithMany(p => p.TaskDetailHistories)
+                .HasForeignKey(d => d.ChangedBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("task_detail_history_changed_by_fkey");
+
+            entity.HasOne(d => d.Task).WithMany(p => p.TaskDetailHistories)
+                .HasForeignKey(d => d.TaskId)
+                .HasConstraintName("task_detail_history_task_id_fkey");
         });
 
         modelBuilder.Entity<TaskHistory>(entity =>
