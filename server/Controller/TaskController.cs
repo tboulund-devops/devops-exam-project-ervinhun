@@ -211,8 +211,14 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             {
                 return NotFound("User not found with id: " + request.AssigneeId);
             }
+            task.AssigneeId = request.AssigneeId;
+            task.Assignee = user;
+        }
 
-            task.AssigneeId = user.Id;
+        if (request.AssigneeId == null)
+        {
+            task.AssigneeId = null;
+            task.Assignee = null;
         }
 
         await ctx.SaveChangesAsync();
@@ -233,7 +239,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
 
         if (task == null)
             return NotFound();
-        
+
         if (task.DeletedAt != null)
             return BadRequest("Task is already deleted.");
 
