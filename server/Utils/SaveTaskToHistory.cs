@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using server.DataAccess;
 
 namespace server.Utils;
@@ -6,12 +7,12 @@ public class SaveTaskToHistory(MyDbContext ctx)
 {
     public async Task OnCreate(TaskItem task, Guid createdBy)
     {
-        var userIdCheck = ctx.Users.Where(u => u.Id == createdBy)
+        var userIdCheck = await ctx.Users.Where(u => u.Id == createdBy)
             .Select(u => u.Id)
-            .FirstOrDefault();
+            .FirstOrDefaultAsync();
         if (userIdCheck == Guid.Empty)
         {
-            throw new Exception("User not found.");
+            throw new KeyNotFoundException("User not found.");
         }
 
         var history = new TaskHistory
@@ -22,18 +23,18 @@ public class SaveTaskToHistory(MyDbContext ctx)
             ChangedBy = createdBy,
         };
         await ctx.TaskHistories.AddAsync(history);
-        ctx.SaveChanges();
+        await ctx.SaveChangesAsync();
     }
     
     
     public async Task OnStatusChange(TaskItem task, Guid fromStatusId, Guid toStatusId, Guid changedBy)
     {
-        var userIdCheck = ctx.Users.Where(u => u.Id == changedBy)
+        var userIdCheck = await ctx.Users.Where(u => u.Id == changedBy)
             .Select(u => u.Id)
-            .FirstOrDefault();
+            .FirstOrDefaultAsync();
         if (userIdCheck == Guid.Empty)
         {
-            throw new Exception("User not found.");
+            throw new KeyNotFoundException("User not found.");
         }
 
         var entry = new TaskHistory

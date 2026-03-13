@@ -25,9 +25,9 @@ if (builder.Environment.IsDevelopment())
 builder.Configuration.AddEnvironmentVariables();
 
 var db = builder.Configuration["CONNECTION_STRING"];
-if (string.IsNullOrWhiteSpace(db))
+if (string.IsNullOrWhiteSpace(db) && !builder.Environment.IsEnvironment("Test"))
 {
-    throw new InvalidOperationException("CONNECTION_STRING not set in environment or appsettings.json");
+    throw new InvalidOperationException("CONNECTION_STRING not set in environment");
 }
 
 builder.Services.AddOpenApiDocument(config =>
@@ -35,9 +35,18 @@ builder.Services.AddOpenApiDocument(config =>
     config.Title = "To-do with extras API";
     config.Version = "v1";
 });
-builder.Services.AddDbContext<MyDbContext>(conf => { conf.UseNpgsql(db); });
+
+if (!builder.Environment.IsEnvironment("Test"))
+{
+    builder.Services.AddDbContext<MyDbContext>(conf => { conf.UseNpgsql(db); });
+}
+
 var app = builder.Build();
-await DatabaseSeeder.InitializeAsync(app.Services, builder.Configuration, db);
+
+if (!builder.Environment.IsEnvironment("Test"))
+{
+    await DatabaseSeeder.InitializeAsync(app.Services, builder.Configuration, db);
+}
 
 app.UseStaticFiles();
 

@@ -5,7 +5,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace server.Utils;
 
-public class DatabaseSeeder
+public static class DatabaseSeeder
 {
     public static async Task InitializeAsync(IServiceProvider services,
         IConfiguration configuration, string connectionString)
@@ -44,7 +44,8 @@ public class DatabaseSeeder
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Failed to initialize database schema: {ex}");
+                await Console.Error.WriteLineAsync($"Failed to initialize database schema: {ex}");
+                throw;
             }
         }
     }
@@ -55,6 +56,7 @@ public class DatabaseSeeder
         if (!await context.TodoTaskStatuses.AnyAsync())
         {
             context.TodoTaskStatuses.AddRange(
+                new TodoTaskStatus { Name = "Backlog" },
                 new TodoTaskStatus { Name = "To-do" },
                 new TodoTaskStatus { Name = "Doing" },
                 new TodoTaskStatus { Name = "Review" },
@@ -68,14 +70,10 @@ public class DatabaseSeeder
         if (!await context.Users.AnyAsync())
         {
             var random = Guid.NewGuid().ToString("N")[..8];
-
-            var user = new User
-            {
-                Username = $"user_{random}",
-                Email = $"user_{random}@example.com"
-            };
-
-            context.Users.Add(user);
+            context.Users.AddRange(
+                new User { Username = "system", Email = "no-reply@system.com" },
+                new User { Username = $"user_{random}", Email = $"user_{random}@example.com" }
+            );
             await context.SaveChangesAsync();
         }
     }
