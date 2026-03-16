@@ -16,6 +16,14 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         return Ok(await ctx.Users.ToListAsync());
     }
 
+    [HttpGet("Statuses")]
+    public async Task<IActionResult> GetStatuses()
+    {
+        return Ok(await ctx.TodoTaskStatuses
+            .Where(s => s.DeletedAt == null)
+            .OrderBy(s => s.Name)
+            .ToListAsync());
+    }
 
     [HttpGet(nameof(GetTasks))]
     public async Task<List<TaskDto>> GetTasks()
@@ -71,6 +79,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
                     }
             })
             .FirstOrDefaultAsync();
+
         if (task == null)
         {
             return NotFound($"Task not found with id: '{id}'");
@@ -111,12 +120,10 @@ public class TaskController(MyDbContext ctx) : ControllerBase
 
         var oldStatus = task.Status;
 
-        // Update task
         task.StatusId = newStatus.Id;
         task.Status = newStatus;
         await ctx.SaveChangesAsync();
 
-        // Save history
         var saveHistory = new SaveTaskToHistory(ctx);
         await saveHistory.OnStatusChange(task, oldStatus.Id, newStatus.Id, user.Id);
 
@@ -126,25 +133,29 @@ public class TaskController(MyDbContext ctx) : ControllerBase
     [HttpPost(nameof(CreateTask))]
     public async Task<ActionResult<TaskDto>> CreateTask([FromBody] CreateTaskRequest request)
     {
-        var defaultStatus = await ctx.TodoTaskStatuses.Where(s => s.Name == "Backlog")
+        var defaultStatus = await ctx.TodoTaskStatuses
+            .Where(s => s.Name == "To-do")
             .FirstOrDefaultAsync();
+
         if (defaultStatus == null)
         {
-            var backlogStatus = new TodoTaskStatus()
+            var todoStatus = new TodoTaskStatus()
             {
-                Name = "Backlog",
+                Name = "To-do",
                 CreatedAt = DateTime.UtcNow,
                 DeletedAt = null
             };
-            await ctx.TodoTaskStatuses.AddAsync(backlogStatus);
+            await ctx.TodoTaskStatuses.AddAsync(todoStatus);
             await ctx.SaveChangesAsync();
-            defaultStatus = backlogStatus;
+            defaultStatus = todoStatus;
         }
 
         User? user = null;
         if (request.AssigneeId != null)
         {
-            user = await ctx.Users.Where(u => u.Id == request.AssigneeId && u.DeletedAt == null).FirstOrDefaultAsync();
+            user = await ctx.Users
+                .Where(u => u.Id == request.AssigneeId && u.DeletedAt == null)
+                .FirstOrDefaultAsync();
             if (user == null)
             {
                 return NotFound($"Assignee not found with id: '{request.AssigneeId}'");
@@ -161,45 +172,26 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             Assignee = user
         };
 
-        //For the history set the uploading user for 'system' at the moment, as we don't have auth yet
-        var systemUser = await ctx.Users.FirstOrDefaultAsync(u => u.Username == "system");
-        if (systemUser == null)
-        {
-            var addSystemUser = new User
-            {
-                Username = "system",
-                Email = "no-reply@system.com",
-                CreatedAt = DateTime.UtcNow,
-            };
-            await ctx.Users.AddAsync(addSystemUser);
-            await ctx.SaveChangesAsync();
-            systemUser = addSystemUser;
-        }
+        // For the history set the uploading user for 'system' at the moment, as we don't have auth yet
+       var systemUser = await ctx.Users.FirstOrDefaultAsync(u => u.Username == "User1");
+		if (systemUser == null)
+		{
+   			 var addSystemUser = new User
+    		{
+        Username = "User1",
+        Email = "user1@example.com",
+        CreatedAt = DateTime.UtcNow,
+    	};
+    	await ctx.Users.AddAsync(addSystemUser);
+    	await ctx.SaveChangesAsync();
+    	systemUser = addSystemUser;
+}
 
         await ctx.TaskItems.AddAsync(newTask);
         await ctx.SaveChangesAsync();
         var saveHistory = new SaveTaskToHistory(ctx);
         await saveHistory.OnCreate(newTask, systemUser.Id);
         return CreatedAtAction(nameof(GetTaskById), new { id = newTask.Id }, MapToTaskDto(newTask));
-    }
-
-    private TaskDto MapToTaskDto(TaskItem task)
-    {
-        return new TaskDto
-        {
-            Id = task.Id,
-            Title = task.Title,
-            Description = task.Description,
-            CreatedAt = task.CreatedAt,
-            Status = task.Status.Name,
-            Assignee = task.Assignee == null
-                ? null
-                : new UserDto
-                {
-                    Id = task.Assignee.Id,
-                    Username = task.Assignee.Username
-                }
-        };
     }
 
     [HttpPut(nameof(UpdateTask))]
@@ -257,9 +249,27 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             return NotFound();
 
         task.DeletedAt = DateTime.UtcNow;
-
         await ctx.SaveChangesAsync();
 
-        return NoContent(); // 204
+        return NoContent();
+    }
+
+    private TaskDto MapToTaskDto(TaskItem task)
+    {
+        return new TaskDto
+        {
+            Id = task.Id,
+            Title = task.Title,
+            Description = task.Description,
+            CreatedAt = task.CreatedAt,
+            Status = task.Status.Name,
+            Assignee = task.Assignee == null
+                ? null
+                : new UserDto
+                {
+                    Id = task.Assignee.Id,
+                    Username = task.Assignee.Username
+                }
+        };
     }
 }
