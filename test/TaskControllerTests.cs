@@ -218,11 +218,12 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
         var usersResponse = await _client.GetAsync("/api/Task/Users");
         var users = await usersResponse.Content.ReadFromJsonAsync<List<UserDto>>();
         users.Should().NotBeNullOrEmpty();
-        var systemUser = users!.First();
+        var systemUser = users!.FirstOrDefault(u => u.Username == "system");
+        systemUser.Should().NotBeNull("because the system user must be seeded before assigning tasks");
 
         // Act
         var response = await _client.PatchAsync(
-            $"/api/Task/AssignTask?taskId={createdTask!.Id}&assigneeId={systemUser.Id}", null);
+            $"/api/Task/AssignTask?taskId={createdTask!.Id}&assigneeId={systemUser!.Id}", null);
         var error = await response.Content.ReadAsStringAsync();
         testOutputHelper.WriteLine($"Status: {response.StatusCode}, Body: {error}");
 
