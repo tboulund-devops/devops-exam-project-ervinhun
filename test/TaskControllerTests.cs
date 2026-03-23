@@ -149,4 +149,88 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
             "because the error message should indicate the assignee was not found, but got: {0}",
             error);
     }
+
+    [Fact]
+    [DisplayName("AssignTask with invalid taskId returns BadRequest")]
+    public async Task AssignTask_InvalidTaskId()
+    {
+        // Act
+        var response = await _client.PatchAsync($"/api/Task/AssignTask?taskId=invalid-id&assigneeId={Guid.NewGuid()}", null);
+
+        // Assert
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    [DisplayName("AssignTask with invalid assigneeId returns BadRequest")]
+    public async Task AssignTask_InvalidAssigneeId()
+    {
+        // Act
+        var response = await _client.PatchAsync($"/api/Task/AssignTask?taskId={Guid.NewGuid()}&assigneeId=invalid-id", null);
+
+        // Assert
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    [DisplayName("AssignTask with non-existing task returns NotFound")]
+    public async Task AssignTask_NonExistingTask()
+    {
+        // Act
+        var response = await _client.PatchAsync($"/api/Task/AssignTask?taskId={Guid.NewGuid()}&assigneeId={Guid.NewGuid()}", null);
+
+        // Assert
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    [DisplayName("AssignTask with non-existing user returns NotFound")]
+    public async Task AssignTask_NonExistingUser()
+    {
+        // Arrange - create a task first
+        var createResponse = await _client.PostAsJsonAsync("/api/Task/CreateTask", new CreateTaskRequest
+        {
+            Title = "Task for AssignTask NonExistingUser test"
+        });
+        var createdTask = await createResponse.Content.ReadFromJsonAsync<TaskDto>();
+        createdTask.Should().NotBeNull();
+
+        // Act
+        var response = await _client.PatchAsync($"/api/Task/AssignTask?taskId={createdTask!.Id}&assigneeId={Guid.NewGuid()}", null);
+
+        // Assert
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    [DisplayName("AssignTask with valid taskId and assigneeId returns Success with assignee set")]
+    public async Task AssignTask_ValidData()
+    {
+        // Arrange - create a task (this also seeds the "system" user)
+        var createResponse = await _client.PostAsJsonAsync("/api/Task/CreateTask", new CreateTaskRequest
+        {
+            Title = "Task for AssignTask test"
+        });
+        var createdTask = await createResponse.Content.ReadFromJsonAsync<TaskDto>();
+        createdTask.Should().NotBeNull();
+
+        // Get the seeded system user
+        var usersResponse = await _client.GetAsync("/api/Task/Users");
+        var users = await usersResponse.Content.ReadFromJsonAsync<List<UserDto>>();
+        users.Should().NotBeNullOrEmpty();
+        var systemUser = users!.First();
+
+        // Act
+        var response = await _client.PatchAsync(
+            $"/api/Task/AssignTask?taskId={createdTask!.Id}&assigneeId={systemUser.Id}", null);
+        var error = await response.Content.ReadAsStringAsync();
+        testOutputHelper.WriteLine($"Status: {response.StatusCode}, Body: {error}");
+
+        // Assert
+        response.IsSuccessStatusCode.Should().BeTrue($"because assign should succeed, but got: {error}");
+        var assignedTask = await response.Content.ReadFromJsonAsync<TaskDto>();
+        assignedTask.Should().NotBeNull();
+        assignedTask!.Assignee.Should().NotBeNull();
+        assignedTask.Assignee!.Id.Should().Be(systemUser.Id);
+    }
 }
