@@ -192,6 +192,8 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
         {
             Title = "Task for AssignTask NonExistingUser test"
         });
+        var createBody = await createResponse.Content.ReadAsStringAsync();
+        createResponse.IsSuccessStatusCode.Should().BeTrue($"because create should succeed, but got: {createBody}");
         var createdTask = await createResponse.Content.ReadFromJsonAsync<TaskDto>();
         createdTask.Should().NotBeNull();
 
@@ -211,6 +213,8 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
         {
             Title = "Task for AssignTask test"
         });
+        var createBody = await createResponse.Content.ReadAsStringAsync();
+        createResponse.IsSuccessStatusCode.Should().BeTrue($"because create should succeed, but got: {createBody}");
         var createdTask = await createResponse.Content.ReadFromJsonAsync<TaskDto>();
         createdTask.Should().NotBeNull();
 
