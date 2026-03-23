@@ -254,7 +254,6 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             return BadRequest("Invalid assignee id.");
 
         var task = await ctx.TaskItems
-            .Include(t => t.Assignee)
             .Include(t => t.Status)
             .FirstOrDefaultAsync(t => t.Id == parsedTaskId && t.DeletedAt == null);
 
