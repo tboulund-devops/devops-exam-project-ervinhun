@@ -262,7 +262,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
 
         var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == parsedAssigneeId && u.DeletedAt == null);
         if (user == null)
-            return NotFound($"User not found with id: '{assigneeId}'");
+            return NotFound($"Assignee not found with id: '{assigneeId}'");
 
         task.AssigneeId = user.Id;
         task.Assignee = user;
