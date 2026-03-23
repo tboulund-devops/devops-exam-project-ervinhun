@@ -155,7 +155,7 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
     public async Task AssignTask_InvalidTaskId()
     {
         // Act
-        var response = await _client.PatchAsync($"/api/Task/AssignTask?taskId=invalid-id&assigneeId={Guid.NewGuid()}", null);
+        var response = await _client.PatchAsync($"/api/Task/AssignTask?id=invalid-id&assigneeId={Guid.NewGuid()}", null);
 
         // Assert
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
@@ -166,7 +166,7 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
     public async Task AssignTask_InvalidAssigneeId()
     {
         // Act
-        var response = await _client.PatchAsync($"/api/Task/AssignTask?taskId={Guid.NewGuid()}&assigneeId=invalid-id", null);
+        var response = await _client.PatchAsync($"/api/Task/AssignTask?id={Guid.NewGuid()}&assigneeId=invalid-id", null);
 
         // Assert
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
@@ -177,7 +177,7 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
     public async Task AssignTask_NonExistingTask()
     {
         // Act
-        var response = await _client.PatchAsync($"/api/Task/AssignTask?taskId={Guid.NewGuid()}&assigneeId={Guid.NewGuid()}", null);
+        var response = await _client.PatchAsync($"/api/Task/AssignTask?id={Guid.NewGuid()}&assigneeId={Guid.NewGuid()}", null);
 
         // Assert
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
@@ -196,7 +196,7 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
         createdTask.Should().NotBeNull();
 
         // Act
-        var response = await _client.PatchAsync($"/api/Task/AssignTask?taskId={createdTask!.Id}&assigneeId={Guid.NewGuid()}", null);
+        var response = await _client.PatchAsync($"/api/Task/AssignTask?id={createdTask!.Id}&assigneeId={Guid.NewGuid()}", null);
 
         // Assert
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
@@ -222,7 +222,7 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
 
         // Act
         var response = await _client.PatchAsync(
-            $"/api/Task/AssignTask?taskId={createdTask!.Id}&assigneeId={systemUser.Id}", null);
+            $"/api/Task/AssignTask?id={createdTask!.Id}&assigneeId={systemUser.Id}", null);
         var error = await response.Content.ReadAsStringAsync();
         testOutputHelper.WriteLine($"Status: {response.StatusCode}, Body: {error}");
 

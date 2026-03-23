@@ -245,9 +245,9 @@ public class TaskController(MyDbContext ctx) : ControllerBase
     }
 
     [HttpPatch(nameof(AssignTask))]
-    public async Task<ActionResult<TaskDto>> AssignTask([FromQuery] string taskId, [FromQuery] string assigneeId)
+    public async Task<ActionResult<TaskDto>> AssignTask([FromQuery] string id, [FromQuery] string assigneeId)
     {
-        if (!Guid.TryParse(taskId, out var parsedTaskId))
+        if (!Guid.TryParse(id, out var parsedTaskId))
             return BadRequest("Invalid task id.");
 
         if (!Guid.TryParse(assigneeId, out var parsedAssigneeId))
@@ -258,7 +258,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             .FirstOrDefaultAsync(t => t.Id == parsedTaskId && t.DeletedAt == null);
 
         if (task == null)
-            return NotFound($"Task not found with id: '{taskId}'");
+            return NotFound($"Task not found with id: '{id}'");
 
         var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == parsedAssigneeId && u.DeletedAt == null);
         if (user == null)
