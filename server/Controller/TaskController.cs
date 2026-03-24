@@ -10,6 +10,7 @@ namespace server.Controller;
 [Route("api/[controller]")]
 public class TaskController(MyDbContext ctx) : ControllerBase
 {
+    private const string InvalidTaskIdMessage = "Invalid task id.";
     [HttpGet("Users")]
     public async Task<IActionResult> GetUsers()
     {
@@ -51,7 +52,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
     {
         if (!Guid.TryParse(id, out var taskId))
         {
-            return BadRequest("Invalid task id.");
+            return BadRequest(InvalidTaskIdMessage);
         }
 
         var task = await ctx.TaskItems
@@ -171,7 +172,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
     {
         if (!Guid.TryParse(id, out var taskId))
         {
-            return BadRequest("Invalid task id.");
+            return BadRequest(InvalidTaskIdMessage);
         }
 
         var task = await ctx.TaskItems
@@ -238,11 +239,96 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         return Ok(MapToTaskDto(task));
     }
 
+    [HttpGet(nameof(GetArchivedTasks))]
+    public async Task<List<TaskDto>> GetArchivedTasks()
+    {
+        return await ctx.TaskItems
+            .Include(t => t.Assignee)
+            .Include(t => t.Status)
+            .Where(t => t.DeletedAt != null)
+            .OrderByDescending(t => t.DeletedAt)
+            .Select(t => new TaskDto
+            {
+                Id = t.Id,
+                Title = t.Title,
+                Description = t.Description,
+                CreatedAt = t.CreatedAt,
+                UpdatedAt = t.UpdatedAt,
+                DeletedAt = t.DeletedAt,
+                Status = t.Status.Name,
+                Assignee = t.Assignee == null
+                    ? null
+                    : new UserDto
+                    {
+                        Id = t.Assignee.Id,
+                        Username = t.Assignee.Username
+                    }
+            })
+            .ToListAsync();
+    }
+
+    [HttpPatch(nameof(ArchiveTask))]
+    public async Task<IActionResult> ArchiveTask([FromQuery] string id)
+    {
+        if (!Guid.TryParse(id, out var taskId))
+            return BadRequest(InvalidTaskIdMessage);
+
+        var task = await ctx.TaskItems.FirstOrDefaultAsync(t => t.Id == taskId);
+
+        if (task == null)
+            return NotFound();
+
+        if (task.DeletedAt != null)
+            return BadRequest("Task is already archived.");
+
+        task.DeletedAt = DateTime.UtcNow;
+        await ctx.SaveChangesAsync();
+
+        var saveHistory = new SaveTaskToHistory(ctx);
+        var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
+        await saveHistory.OnDelete(task.Id, systemUser.Id, task.DeletedAt.Value);
+
+        return NoContent();
+    }
+
+    [HttpPatch(nameof(UnarchiveTask))]
+    public async Task<IActionResult> UnarchiveTask([FromQuery] string id)
+    {
+        if (!Guid.TryParse(id, out var taskId))
+            return BadRequest(InvalidTaskIdMessage);
+
+        var task = await ctx.TaskItems.FirstOrDefaultAsync(t => t.Id == taskId);
+
+        if (task == null)
+            return NotFound();
+
+        if (task.DeletedAt == null)
+            return BadRequest("Task is not archived.");
+
+        var archivedAt = task.DeletedAt.Value;
+        task.DeletedAt = null;
+        await ctx.SaveChangesAsync();
+
+        var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
+        ctx.TaskDetailHistories.Add(new TaskDetailHistory
+        {
+            TaskId = task.Id,
+            FieldName = "DeletedAt",
+            OldValue = archivedAt.ToString("o"),
+            NewValue = null,
+            ChangedBy = systemUser.Id,
+            ChangedAt = DateTime.UtcNow
+        });
+        await ctx.SaveChangesAsync();
+
+        return NoContent();
+    }
+
     [HttpDelete(nameof(DeleteTask))]
     public async Task<IActionResult> DeleteTask([FromQuery] string id)
     {
         if (!Guid.TryParse(id, out var taskId))
-            return BadRequest("Invalid task id.");
+            return BadRequest(InvalidTaskIdMessage);
 
         var task = await ctx.TaskItems
             .FirstOrDefaultAsync(t => t.Id == taskId);
