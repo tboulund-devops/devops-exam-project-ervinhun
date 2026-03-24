@@ -1,13 +1,13 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System;
+using System.Collections.Generic;
 
 namespace server.DataAccess;
 
-public class TodoTaskStatus
+public partial class TodoTaskStatus
 {
     public Guid Id { get; set; }
 
-    [Length(1, 255)]
-    public required string Name { get; set; }
+    public string Name { get; set; } = null!;
 
     public DateTime CreatedAt { get; set; }
 
