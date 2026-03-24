@@ -67,7 +67,7 @@ public static class DatabaseSeeder
         }
 
         // Seed Random User
-        if (!await context.Users.AnyAsync())
+        if (!await context.Users.AnyAsync(u => u.Username == "system"))
         {
             var random = Guid.NewGuid().ToString("N")[..8];
             context.Users.AddRange(
