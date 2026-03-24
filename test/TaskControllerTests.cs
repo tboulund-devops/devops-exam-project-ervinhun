@@ -235,6 +235,9 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
         assignedTask.Should().NotBeNull();
         assignedTask!.Assignee.Should().NotBeNull();
         assignedTask.Assignee!.Id.Should().Be(systemUser.Id);
+        }
+
+    [Fact]    
     [DisplayName("UpdateTask with valid data writes title and description history")]
     public async Task UpdateTask_ValidData_WritesHistory()
     {
