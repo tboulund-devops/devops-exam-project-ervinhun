@@ -35,13 +35,40 @@ CREATE TABLE IF NOT EXISTS task_item (
     );
 
 CREATE TABLE IF NOT EXISTS task_history (
-                                            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     task_id UUID NOT NULL REFERENCES task_item(id) ON DELETE CASCADE,
     from_status_id UUID REFERENCES todo_task_status(id) ON DELETE SET NULL,
     to_status_id UUID REFERENCES todo_task_status(id) ON DELETE SET NULL,
     changed_by UUID REFERENCES users(id) ON DELETE SET NULL,
     changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+-- Forward migration block for task_detail_history and its index.
+-- This can be safely re-run on existing databases; it only creates the
+-- table and index if they are missing.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_tables
+        WHERE schemaname = 'public'
+          AND tablename = 'task_detail_history'
+    ) THEN
+        CREATE TABLE task_detail_history (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            task_id UUID NOT NULL REFERENCES task_item(id) ON DELETE CASCADE,
+            field_name TEXT NOT NULL,
+            old_value TEXT,
+            new_value TEXT,
+            changed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+            changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE INDEX idx_task_detail_history_task_id_changed_at
+            ON task_detail_history(task_id, changed_at);
+    END IF;
+END;
+$$;
 
 CREATE TABLE IF NOT EXISTS task_comments (
                                              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -64,6 +91,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE INDEX IF NOT EXISTS idx_task_item_status_id ON task_item(status_id);
 CREATE INDEX IF NOT EXISTS idx_task_item_assignee_id ON task_item(assignee_id);
 CREATE INDEX IF NOT EXISTS idx_task_history_task_id ON task_history(task_id);
+-- Index for task_detail_history is created in the forward-migration block above.
 CREATE INDEX IF NOT EXISTS idx_task_comments_task_id ON task_comments(task_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 
