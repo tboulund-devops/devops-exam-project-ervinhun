@@ -221,8 +221,7 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
         var usersResponse = await _client.GetAsync("/api/Task/Users");
         var users = await usersResponse.Content.ReadFromJsonAsync<List<UserDto>>();
         users.Should().NotBeNullOrEmpty();
-        var systemUser = users!.First();
-
+        var systemUser = users!.First(u => u.Username == "system");
         // Act
         var response = await _client.PatchAsync(
             $"/api/Task/AssignTask?taskId={createdTask!.Id}&assigneeId={systemUser.Id}", null);
