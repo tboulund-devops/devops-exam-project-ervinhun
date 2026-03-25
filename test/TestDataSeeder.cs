@@ -53,6 +53,30 @@ internal static class TestDataSeeder
             });
             db.SaveChanges();
         }
+
+        if (!db.Notifications.Any(n => n.UserId == testUserId && n.Message == "Seeded unread notification"))
+        {
+            db.Notifications.Add(new Notification
+            {
+                UserId = testUserId,
+                Message = "Seeded unread notification",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow.AddMinutes(-10)
+            });
+        }
+
+        if (!db.Notifications.Any(n => n.UserId == testUserId && n.Message == "Seeded read notification"))
+        {
+            db.Notifications.Add(new Notification
+            {
+                UserId = testUserId,
+                Message = "Seeded read notification",
+                IsRead = true,
+                CreatedAt = DateTime.UtcNow.AddMinutes(-5)
+            });
+        }
+
+        db.SaveChanges();
     }
 }
 
