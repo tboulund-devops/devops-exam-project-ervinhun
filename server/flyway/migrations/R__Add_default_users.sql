@@ -16,6 +16,6 @@ INSERT INTO users (username, email)
 SELECT gu.username, gu.username || '@example.com'
 FROM generated_user gu
 WHERE NOT EXISTS (
-    SELECT 1 FROM users WHERE username LIKE 'user\_%' ESCAPE '\\'
+    SELECT 1 FROM users WHERE username LIKE 'user\_%' ESCAPE '\'
 );
 

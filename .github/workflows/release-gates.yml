@@ -2,11 +2,12 @@ name: Release Gates
 
 on:
   push:
-    branches: ["main"]
+    branches: ["dev", "main"]
   workflow_dispatch:
 
 jobs:
   migrate-db-staging:
+    if: ${{ github.ref_name == 'dev' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -118,6 +119,7 @@ jobs:
         run: cat api.log
 
   staging-e2e-validation:
+    if: ${{ github.ref_name == 'dev' }}
     runs-on: ubuntu-latest
     needs: migrate-db-staging
     env:
@@ -150,8 +152,9 @@ jobs:
           curl -fsS "$BASE_URL/api/Task/GetTaskById?id=$TASK_ID" > /dev/null
 
   migrate-db-production:
+    if: ${{ github.ref_name == 'main' }}
     runs-on: ubuntu-latest
-    needs: [integration-core-feature, k6-performance-smoke, staging-e2e-validation]
+    needs: [integration-core-feature, k6-performance-smoke]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

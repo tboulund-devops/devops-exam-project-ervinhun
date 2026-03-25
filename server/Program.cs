@@ -1,7 +1,6 @@
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using server.DataAccess;
-using server.Utils;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
@@ -43,10 +42,6 @@ if (!builder.Environment.IsEnvironment("Test"))
 
 var app = builder.Build();
 
-if (!builder.Environment.IsEnvironment("Test"))
-{
-    await DatabaseSeeder.InitializeAsync(app.Services, builder.Configuration, db);
-}
 
 app.UseStaticFiles();
 
@@ -57,4 +52,4 @@ app.MapControllers();
 app.UseOpenApi();
 app.UseSwaggerUi();
 
-app.Run();
+await app.RunAsync();

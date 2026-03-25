@@ -7,6 +7,7 @@ namespace server.Utils;
 
 public static class DatabaseSeeder
 {
+    // TODO: This class can be removed once we see that the flyway is working as intended
     public static async Task InitializeAsync(IServiceProvider services,
         IConfiguration configuration, string connectionString)
     {
