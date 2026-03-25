@@ -55,7 +55,7 @@ docker compose up --build
 | `CONNECTION_STRING` | Yes (non-Test) | PostgreSQL connection string         |
 | `ASPNETCORE_ENVIRONMENT` | No      | Defaults to `Production`; use `Development` locally or `Test` for integration tests |
 
-> **Note:** When `ASPNETCORE_ENVIRONMENT` is `Test`, `Program.cs` skips `DbContext` registration and `DatabaseSeeder` initialization. Integration tests register the `DbContext` themselves via `CustomWebApplicationFactory`.
+> **Note:** `ASPNETCORE_ENVIRONMENT` controls the standard ASP.NET Core hosting environment (for example, `Development`, `Production`, or `Test`). The current `server/Program.cs` does not branch on this value; integration tests customize services and database setup via `CustomWebApplicationFactory` in the `test` project.
 
 ## Testing
 
@@ -78,18 +78,18 @@ Key testing conventions:
 - **Nullable reference types** are enabled (`<Nullable>enable</Nullable>`). Always annotate nullability correctly.
 - **Implicit usings** are enabled — no need to add common `using` statements manually.
 - Follow standard **ASP.NET Core** patterns: constructor injection for dependencies, use `ILogger<T>` for logging.
-- Keep controllers thin — delegate logic to service classes or utilities in `Utils/`.
-- **Database schema** is defined in `server/DataAccess/schema.sql` (copied to output directory). `DatabaseSeeder` runs it at startup in non-Test environments.
-- The `set_updated_at()` trigger in `schema.sql` keeps `updated_at` current on `UPDATE` for `users` and `task_item` tables — do not manually update `updated_at` in application code.
-- Task history is recorded in `SaveTaskToHistory` for changes to `Title`, `Description`, and `AssigneeId`.
-- When authentication is not yet implemented, use the `system` user (username `"system"`) for history records.
+- When controllers and service classes are present, keep controllers thin by delegating business logic to services or shared utilities (for example, helpers in `Utils/`).
+- When a dedicated **database schema** file is introduced (for example, under a `server/DataAccess/` folder and copied to the output directory), ensure any seeding component (such as a `DatabaseSeeder`) applies it at startup in non-Test environments.
+- When using database triggers to maintain timestamps (for example, a `set_updated_at()` trigger defined in the schema), rely on them to keep `updated_at` current on `UPDATE` for relevant tables instead of updating `updated_at` manually in application code.
+- When task history tracking is implemented (for example, via a `SaveTaskToHistory` helper or similar mechanism), ensure it records changes to key fields such as `Title`, `Description`, and `AssigneeId`.
+- When authentication is not yet implemented, use a consistent placeholder user (for example, a `system` user with username `"system"`) for history records.
 
 ## API Conventions
 
 - Use RESTful resource naming: `GET /tasks`, `POST /tasks`, `GET /tasks/{id}`, `PUT /tasks/{id}`, `DELETE /tasks/{id}`.
 - Return appropriate HTTP status codes: `200 OK`, `201 Created`, `204 No Content`, `400 Bad Request`, `404 Not Found`.
 - Use `async`/`await` throughout all controller actions and data access methods.
-- Document endpoints with XML comments so Swagger picks them up.
+- Document endpoints (for example, with XML comments) so they can be picked up by Swagger / OpenAPI tooling when it is enabled.
 
 ## Docker
 
