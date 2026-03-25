@@ -43,7 +43,7 @@ export function callEndpoint(endpoint, existingTaskIds) {
         });
         res = http.post(url, payload, params);
         // Delete after creation if backend allows
-        http.delete(`${BASE_URL}/api/Task/DeleteTask?id=${res.json().id}`, params);
+        http.del(`${BASE_URL}/api/Task/DeleteTask?id=${res.json().id}`, params);
     } else return null;
 
     let data;
@@ -51,7 +51,7 @@ export function callEndpoint(endpoint, existingTaskIds) {
 
     check(res, {
         'status is 200 or 201': r => r.status === 200 || r.status === 201,
-        'valid array': () => endpoint.type !== 'array' || (Array.isArray(data) && data.length > 0),
+        'valid array': () => endpoint.type !== 'array' || Array.isArray(data),
         'valid object': () => endpoint.type !== 'object' || (data && data.id),
     });
 

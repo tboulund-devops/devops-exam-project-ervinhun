@@ -1,4 +1,4 @@
-import { endpoints, setupTasks, callEndpoint, getRandom } from './test-helpers.js';
+import { endpoints, setupTasks, callEndpoint, getRandom } from './test-helper.js';
 
 export const options = {
     stages: [

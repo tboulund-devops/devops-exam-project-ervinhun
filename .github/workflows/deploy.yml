@@ -79,5 +79,6 @@ jobs:
             cd ~/dowa
             export IMAGE_REPO=ghcr.io/${{ github.repository }}
             export IMAGE_TAG=${{ steps.semver-app.outputs.version }}
+            export CONNECTION_STRING=${{ secrets.STAGING_CONNECTION_STRING }}
             docker compose -f compose.deploy.yml pull
             docker compose -f compose.deploy.yml up -d
