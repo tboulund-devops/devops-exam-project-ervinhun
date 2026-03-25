@@ -3,7 +3,11 @@ import { check, sleep } from 'k6';
 
 export const BASE_URL = __ENV.BASE_URL || 'http://localhost:5000';
 export const params = {
-    headers: { 'Accept': 'application/json', 'X-Test-Mode': 'true' },
+    headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Test-Mode': 'true'
+    },
 };
 
 export const endpoints = [
