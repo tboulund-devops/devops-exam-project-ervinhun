@@ -10,7 +10,7 @@
 When creating GitHub issues or discussions:
 - Use `###` (h3) for main sections (e.g., "### Test Summary")
 - Use `####` (h4) for subsections (e.g., "#### Device-Specific Results")
-- Never use `##` (h2) or `#` (h1) in reports - these are reserved for titles
+- Never use `##` (h2) or `#` (h1) in generated reports - these are reserved for titles
 
 ### 2. Progressive Disclosure
 **Wrap detailed test results in `<details><summary><b>Section Name</b></summary>` tags to improve readability and reduce scrolling.**
@@ -66,7 +66,7 @@ Reports should:
 [Actionable next steps - keep visible]
 ```
 
-## Workflow Run References
+### Workflow Run References
 
 - Format run IDs as links: `[§12345](https://github.com/owner/repo/actions/runs/12345)`
 - Include up to 3 most relevant run URLs at end under `**References:**`
