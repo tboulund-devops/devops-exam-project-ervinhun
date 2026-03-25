@@ -11,9 +11,17 @@ namespace server.Controller;
 public class TaskController(MyDbContext ctx) : ControllerBase
 {
     [HttpGet("Users")]
-    public async Task<IActionResult> GetUsers()
+    public async Task<ActionResult<List<UserDto>>> GetUsers()
     {
-        return Ok(await ctx.Users.ToListAsync());
+        var users = await ctx.Users
+            .Where(u => u.DeletedAt == null)
+            .Select(u => new UserDto
+            {
+                Id = u.Id,
+                Username = u.Username
+            })
+            .ToListAsync();
+        return Ok(users);
     }
 
 
@@ -93,7 +101,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
 
         if (task == null)
         {
-            throw new KeyNotFoundException("Task not found.");
+            return NotFound("Task not found.");
         }
 
         var newStatus = await ctx.TodoTaskStatuses
@@ -101,19 +109,30 @@ public class TaskController(MyDbContext ctx) : ControllerBase
 
         if (newStatus == null)
         {
-            throw new KeyNotFoundException("New status not found.");
+            return NotFound("New status not found.");
         }
 
         var oldStatus = task.Status;
 
-        // Update task
-        task.StatusId = newStatus.Id;
-        task.Status = newStatus;
-        await ctx.SaveChangesAsync();
+        await using var transaction = await ctx.Database.BeginTransactionAsync();
+        try
+        {
+            // Update task
+            task.StatusId = newStatus.Id;
+            task.Status = newStatus;
+            await ctx.SaveChangesAsync();
 
-        // Save history
-        var saveHistory = new SaveTaskToHistory(ctx);
-        await saveHistory.OnStatusChange(task, oldStatus.Id, newStatus.Id, request.ChangedByUserId);
+            // Save history
+            var saveHistory = new SaveTaskToHistory(ctx);
+            await saveHistory.OnStatusChange(task, oldStatus.Id, newStatus.Id, request.ChangedByUserId);
+
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
 
         return Ok(MapToTaskDto(task));
     }
@@ -148,8 +167,8 @@ public class TaskController(MyDbContext ctx) : ControllerBase
 
         var newTask = new TaskItem
         {
-            Title = request.Title,
-            Description = request.Description,
+            Title = request.Title.Trim(),
+            Description = request.Description?.Trim(),
             AssigneeId = request.AssigneeId,
             StatusId = defaultStatus.Id,
             Status = defaultStatus,
@@ -159,10 +178,16 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         //For the history set the uploading user for 'system' at the moment, as we don't have auth yet
 
         var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
-        await ctx.TaskItems.AddAsync(newTask);
-        await ctx.SaveChangesAsync();
-        var saveHistory = new SaveTaskToHistory(ctx);
-        await saveHistory.OnCreate(newTask, systemUser.Id);
+        await using (var transaction = await ctx.Database.BeginTransactionAsync())
+        {
+            await ctx.TaskItems.AddAsync(newTask);
+            await ctx.SaveChangesAsync();
+
+            var saveHistory = new SaveTaskToHistory(ctx);
+            await saveHistory.OnCreate(newTask, systemUser.Id);
+
+            await transaction.CommitAsync();
+        }
         return CreatedAtAction(nameof(GetTaskById), new { id = newTask.Id }, MapToTaskDto(newTask));
     }
 
@@ -221,10 +246,20 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             task.Assignee = null;
         }
 
-        await ctx.SaveChangesAsync();
-        var saveHistory = new SaveTaskToHistory(ctx);
-        var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
-        await saveHistory.OnUpdate(oldTask, request, systemUser.Id);
+        await using var updateTransaction = await ctx.Database.BeginTransactionAsync();
+        try
+        {
+            await ctx.SaveChangesAsync();
+            var saveHistory = new SaveTaskToHistory(ctx);
+            var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
+            await saveHistory.OnUpdate(oldTask, request, systemUser.Id);
+            await updateTransaction.CommitAsync();
+        }
+        catch
+        {
+            await updateTransaction.RollbackAsync();
+            throw;
+        }
         return Ok(MapToTaskDto(task));
     }
 
@@ -243,12 +278,23 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         if (task.DeletedAt != null)
             return BadRequest("Task is already deleted.");
 
-        task.DeletedAt = DateTime.UtcNow;
+        await using var transaction = await ctx.Database.BeginTransactionAsync();
+        try
+        {
+            task.DeletedAt = DateTime.UtcNow;
 
-        await ctx.SaveChangesAsync();
-        var saveHistory = new SaveTaskToHistory(ctx);
-        var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
-        await saveHistory.OnDelete(task.Id, systemUser.Id, task.DeletedAt.Value);
+            var saveHistory = new SaveTaskToHistory(ctx);
+            var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
+            await saveHistory.OnDelete(task.Id, systemUser.Id, task.DeletedAt.Value);
+
+            await ctx.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
         return NoContent(); // 204
     }
 

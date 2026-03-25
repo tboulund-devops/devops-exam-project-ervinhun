@@ -6,14 +6,18 @@ using server.Utils;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
-// Add CORS
+// Add CORS — permissive in Development only; in production the API is expected
+// to be served from the same origin, so no cross-origin policy is defined.
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyHeader()
-              .AllowAnyMethod();
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
     });
 });
 
@@ -45,7 +49,7 @@ var app = builder.Build();
 
 if (!builder.Environment.IsEnvironment("Test"))
 {
-    await DatabaseSeeder.InitializeAsync(app.Services, builder.Configuration, db);
+    await DatabaseSeeder.InitializeAsync(app.Services, db);
 }
 
 app.UseStaticFiles();
