@@ -2,7 +2,7 @@ name: Deploy to production
 
 on:
   workflow_run:
-    workflows: ["SonarQube Analysis"]
+    workflows: ["Release Gates"]
     types: [completed]
     branches:
       - main
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   delivery:
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.name == 'SonarQube Analysis' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.name == 'Release Gates' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -60,13 +60,13 @@ jobs:
             - This release includes the following container image:
             https://ghcr.io/${{ github.repository }}:${{ steps.semver-app.outputs.version }}
 
-      - name: Deliver Docker Compose file to staging
+      - name: Deliver deployment Compose file to staging
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ vars.STAGING_SERVER_IP }}
           username: ${{ vars.STAGING_SERVER_USERNAME }}
           key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
-          source: compose.yml
+          source: compose.deploy.yml
           target: ~/dowa/
 
       - name: Run Docker Compose on staging server
@@ -77,5 +77,7 @@ jobs:
           key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
           script: |
             cd ~/dowa
-            docker compose pull
-            docker compose up -d
+            export IMAGE_REPO=ghcr.io/${{ github.repository }}
+            export IMAGE_TAG=${{ steps.semver-app.outputs.version }}
+            docker compose -f compose.deploy.yml pull
+            docker compose -f compose.deploy.yml up -d
