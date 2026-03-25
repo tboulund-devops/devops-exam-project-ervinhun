@@ -96,3 +96,49 @@ Key testing conventions:
 - The API and PostgreSQL run as separate containers.
 - Pass `CONNECTION_STRING` as an environment variable to the API container.
 - Use a named Docker volume for PostgreSQL data persistence.
+
+## Critical Requirements (MANDATORY)
+
+- Every code change MUST include unit or integration tests.
+- Minimum 80% test coverage for all new or modified code.
+- Code without tests is considered incomplete.
+- Do not implement features without verifying them through tests.
+
+## Testing Guidelines
+
+- Prefer integration tests using Testcontainers for API behavior.
+- Use unit tests for business logic in isolation.
+- Tests must cover:
+  - Success cases
+  - Failure cases
+  - Edge cases
+- When fixing bugs:
+  1. First write a failing test.
+  2. Then implement the fix.
+  3. Ensure the test passes.
+- Do not modify or remove existing tests unless they are incorrect.
+
+## Handling Code Review Comments
+
+When addressing review comments:
+
+- Fix the root cause, not just the visible issue.
+- Update or add tests to reflect the fix.
+- Keep changes minimal and focused.
+- Do not introduce unrelated refactoring.
+- Ensure all tests pass before finishing.
+
+Avoid:
+- Superficial fixes
+- Ignoring failing tests
+- Changing behavior without test coverage
+
+## Definition of Done
+
+A task or feature is complete only if:
+
+- Code is implemented.
+- Tests are added (≥80% coverage for new code).
+- All tests pass.
+- API behavior is validated via integration tests.
+- Code follows repository conventions.
