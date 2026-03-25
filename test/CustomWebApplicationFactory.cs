@@ -71,7 +71,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<server.Program>
         // see the same triggers, functions, indexes, etc. If schema.sql is not
         // available, fall back to EnsureCreated() to preserve existing behavior.
         var baseDirectory = AppContext.BaseDirectory;
-        var schemaPath = Path.Combine(baseDirectory, "schema.sql");
+        var schemaPath = Path.Combine(baseDirectory, "DataAccess", "schema.sql");
 
         if (File.Exists(schemaPath))
         {

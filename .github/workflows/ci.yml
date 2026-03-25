@@ -37,11 +37,11 @@ jobs:
         run: dotnet stryker --project server.csproj --test-project ../test/test.csproj --output ../StrykerOutput
           
         
-      - name: Upload coverage report
+      - name: Upload Stryker output
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
+          name: stryker-output
           path: StrykerOutput
 
       - name: Run Tests with Code Coverage

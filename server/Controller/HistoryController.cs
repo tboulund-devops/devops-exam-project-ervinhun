@@ -8,6 +8,7 @@ namespace server.Controller;
 [Route("api/[controller]")]
 public class HistoryController(MyDbContext ctx) : ControllerBase
 {
+    private const int DefaultPageSize = 50;
     private const int MaxPageSize = 500;
 
     [HttpGet(nameof(GetTaskHistory))]
@@ -18,13 +19,9 @@ public class HistoryController(MyDbContext ctx) : ControllerBase
             .OrderBy(t => t.ChangedAt)
             .AsQueryable();
 
-        if (pageNumber.HasValue && pageSize.HasValue && pageNumber.Value > 0 && pageSize.Value > 0)
-        {
-            var size = Math.Min(pageSize.Value, MaxPageSize);
-            query = query
-                .Skip((pageNumber.Value - 1) * size)
-                .Take(size);
-        }
+        var page = pageNumber is > 0 ? pageNumber.Value : 1;
+        var size = Math.Min(pageSize is > 0 ? pageSize.Value : DefaultPageSize, MaxPageSize);
+        query = query.Skip((page - 1) * size).Take(size);
 
         var result = await query.ToListAsync();
         return Ok(result);
@@ -38,13 +35,9 @@ public class HistoryController(MyDbContext ctx) : ControllerBase
             .OrderBy(t => t.ChangedAt)
             .AsQueryable();
 
-        if (pageNumber.HasValue && pageSize.HasValue && pageNumber.Value > 0 && pageSize.Value > 0)
-        {
-            var size = Math.Min(pageSize.Value, MaxPageSize);
-            query = query
-                .Skip((pageNumber.Value - 1) * size)
-                .Take(size);
-        }
+        var page = pageNumber is > 0 ? pageNumber.Value : 1;
+        var size = Math.Min(pageSize is > 0 ? pageSize.Value : DefaultPageSize, MaxPageSize);
+        query = query.Skip((page - 1) * size).Take(size);
 
         var result = await query.ToListAsync();
         return Ok(result);

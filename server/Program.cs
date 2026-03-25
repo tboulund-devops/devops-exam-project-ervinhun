@@ -6,14 +6,28 @@ using server.Utils;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
-// Add CORS
+// Add CORS — permissive in Development; in other environments origins are
+// restricted to the comma-separated list in the ALLOWED_ORIGINS env variable.
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyHeader()
-              .AllowAnyMethod();
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+        else
+        {
+            var allowedOrigins = builder.Configuration["ALLOWED_ORIGINS"];
+            if (!string.IsNullOrWhiteSpace(allowedOrigins))
+            {
+                policy.WithOrigins(allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                      .AllowAnyHeader()
+                      .AllowAnyMethod();
+            }
+        }
     });
 });
 
@@ -45,7 +59,7 @@ var app = builder.Build();
 
 if (!builder.Environment.IsEnvironment("Test"))
 {
-    await DatabaseSeeder.InitializeAsync(app.Services, builder.Configuration, db);
+    await DatabaseSeeder.InitializeAsync(app.Services, db!);
 }
 
 app.UseStaticFiles();
