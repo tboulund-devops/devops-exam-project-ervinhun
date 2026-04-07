@@ -240,11 +240,11 @@ public class TaskController(MyDbContext ctx, ITaskService taskService) : Control
     
     // Jeg er Emre
     [HttpGet(nameof(GetTasks))]
-    public async Task<ActionResult<List<TaskDto>>> GetTasks([FromQuery] GetTasksQuery query)
+    public async Task<ActionResult<List<TaskDto>>> GetTasks([FromQuery] TaskQueryParameters query)
     {
         try
         {
-            var tasks = await taskService.GetTasksAsync(query);
+            var tasks = await taskService.GetTasksByQueryAsync(query);
             return Ok(tasks);
         }
         catch (ArgumentException ex)

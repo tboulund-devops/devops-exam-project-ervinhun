@@ -6,7 +6,7 @@ namespace server.Services;
 
 public class TaskService(MyDbContext ctx) : ITaskService
 {
-    public async Task<List<TaskDto>> GetTasksAsync(GetTasksQuery query)
+    public async Task<List<TaskDto>> GetTasksByQueryAsync(TaskQueryParameters query)
     {
         var tasksQuery = ctx.TaskItems
             .AsNoTracking()
@@ -18,8 +18,19 @@ public class TaskService(MyDbContext ctx) : ITaskService
         if (!string.IsNullOrWhiteSpace(query.Status))
         {
             var status = query.Status.Trim();
-
             tasksQuery = tasksQuery.Where(t => t.Status.Name.ToLower() == status.ToLower());
+        }
+
+        // Filter by assignee id
+        if (query.AssigneeId.HasValue)
+        {
+            tasksQuery = tasksQuery.Where(t => t.AssigneeId == query.AssigneeId.Value);
+        }
+        else if (query.HasAssignee.HasValue)
+        {
+            tasksQuery = query.HasAssignee.Value
+                ? tasksQuery.Where(t => t.AssigneeId != null)
+                : tasksQuery.Where(t => t.AssigneeId == null);
         }
         
         // Sort

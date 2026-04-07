@@ -4,5 +4,5 @@ namespace server.Services;
 
 public interface ITaskService
 {
-    Task<List<TaskDto>> GetTasksAsync(GetTasksQuery query);
+    Task<List<TaskDto>> GetTasksByQueryAsync(TaskQueryParameters  query);
 }
