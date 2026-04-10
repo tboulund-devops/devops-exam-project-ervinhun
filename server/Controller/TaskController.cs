@@ -17,36 +17,6 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
         return Ok(await ctx.Users.ToListAsync());
     }
 
-
-    [HttpGet(nameof(GetTasks))]
-    public async Task<List<TaskDto>> GetTasks()
-    {
-        var tasks = await ctx.TaskItems
-            .Include(t => t.Assignee)
-            .Include(t => t.Status)
-            .Where(t => t.DeletedAt == null)
-            .OrderBy(t => t.CreatedAt)
-            .Select(t => new TaskDto
-            {
-                Id = t.Id,
-                Title = t.Title,
-                Description = t.Description,
-                CreatedAt = t.CreatedAt,
-                UpdatedAt = t.UpdatedAt,
-                DeletedAt = t.DeletedAt,
-                Status = t.Status.Name,
-                Assignee = t.Assignee == null
-                    ? null
-                    : new UserDto
-                    {
-                        Id = t.Assignee.Id,
-                        Username = t.Assignee.Username
-                    }
-            })
-            .ToListAsync();
-        return tasks;
-    }
-
     [HttpGet(nameof(GetTaskById))]
     public async Task<ActionResult<TaskDto>> GetTaskById([FromQuery] string id)
     {
@@ -317,7 +287,6 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
         return systemUser ?? throw new KeyNotFoundException("System user not found.");
     }
     
-    // Jeg er Emre
     [HttpGet(nameof(GetTasks))]
     public async Task<ActionResult<List<TaskDto>>> GetTasks([FromQuery] TaskQueryParameters query)
     {
