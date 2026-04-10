@@ -2,49 +2,20 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using server.DataAccess;
 using server.Dto;
+using server.Services;
 using server.Utils;
 
 namespace server.Controller;
 
 [ApiController]
 [Route("api/[controller]")]
-public class TaskController(MyDbContext ctx) : ControllerBase
+public class TaskController(MyDbContext ctx, ITaskService taskService ) : ControllerBase
 {
     private const string InvalidTaskIdMessage = "Invalid task id.";
     [HttpGet("Users")]
     public async Task<IActionResult> GetUsers()
     {
         return Ok(await ctx.Users.ToListAsync());
-    }
-
-
-    [HttpGet(nameof(GetTasks))]
-    public async Task<List<TaskDto>> GetTasks()
-    {
-        var tasks = await ctx.TaskItems
-            .Include(t => t.Assignee)
-            .Include(t => t.Status)
-            .Where(t => t.DeletedAt == null)
-            .OrderBy(t => t.CreatedAt)
-            .Select(t => new TaskDto
-            {
-                Id = t.Id,
-                Title = t.Title,
-                Description = t.Description,
-                CreatedAt = t.CreatedAt,
-                UpdatedAt = t.UpdatedAt,
-                DeletedAt = t.DeletedAt,
-                Status = t.Status.Name,
-                Assignee = t.Assignee == null
-                    ? null
-                    : new UserDto
-                    {
-                        Id = t.Assignee.Id,
-                        Username = t.Assignee.Username
-                    }
-            })
-            .ToListAsync();
-        return tasks;
     }
 
     [HttpGet(nameof(GetTaskById))]
@@ -401,4 +372,20 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         var systemUser = await ctx.Users.FirstOrDefaultAsync(u => u.Username == "system" && u.DeletedAt == null);
         return systemUser ?? throw new KeyNotFoundException("System user not found.");
     }
+    
+    [HttpGet(nameof(GetTasks))]
+    public async Task<ActionResult<List<TaskDto>>> GetTasks([FromQuery] TaskQueryParameters query)
+    {
+        try
+        {
+            var tasks = await taskService.GetTasksByQueryAsync(query);
+            return Ok(tasks);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
 }
+    
+    
