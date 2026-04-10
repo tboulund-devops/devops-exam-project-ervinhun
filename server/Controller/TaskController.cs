@@ -322,6 +322,8 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         await ctx.SaveChangesAsync();
 
         return NoContent();
+    }
+        
     [HttpPatch(nameof(AssignTask))]
     public async Task<ActionResult<TaskDto>> AssignTask([FromQuery] string taskId, [FromQuery] string assigneeId)
     {
