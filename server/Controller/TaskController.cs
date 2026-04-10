@@ -2,50 +2,24 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using server.DataAccess;
 using server.Dto;
+using server.Services;
 using server.Utils;
 
 namespace server.Controller;
 
 [ApiController]
 [Route("api/[controller]")]
-public class TaskController(MyDbContext ctx) : ControllerBase
+public class TaskController(MyDbContext ctx, ITaskService taskService ) : ControllerBase
 {
     private const string InvalidTaskIdMessage = "Invalid task id.";
+<<<<<<< feature/DEV-33
 
+=======
+>>>>>>> dev
     [HttpGet("Users")]
     public async Task<IActionResult> GetUsers()
     {
         return Ok(await ctx.Users.ToListAsync());
-    }
-
-
-    [HttpGet(nameof(GetTasks))]
-    public async Task<List<TaskDto>> GetTasks()
-    {
-        var tasks = await ctx.TaskItems
-            .Include(t => t.Assignee)
-            .Include(t => t.Status)
-            .Where(t => t.DeletedAt == null)
-            .OrderBy(t => t.CreatedAt)
-            .Select(t => new TaskDto
-            {
-                Id = t.Id,
-                Title = t.Title,
-                Description = t.Description,
-                CreatedAt = t.CreatedAt,
-                UpdatedAt = t.UpdatedAt,
-                DeletedAt = t.DeletedAt,
-                Status = t.Status.Name,
-                Assignee = t.Assignee == null
-                    ? null
-                    : new UserDto
-                    {
-                        Id = t.Assignee.Id,
-                        Username = t.Assignee.Username
-                    }
-            })
-            .ToListAsync();
-        return tasks;
     }
 
     [HttpGet(nameof(GetTaskById))]
@@ -240,6 +214,118 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         return Ok(MapToTaskDto(task));
     }
 
+    [HttpGet(nameof(GetArchivedTasks))]
+    public async Task<List<TaskDto>> GetArchivedTasks()
+    {
+        return await ctx.TaskItems
+            .Include(t => t.Assignee)
+            .Include(t => t.Status)
+            .Where(t => t.DeletedAt != null)
+            .OrderByDescending(t => t.DeletedAt)
+            .Select(t => new TaskDto
+            {
+                Id = t.Id,
+                Title = t.Title,
+                Description = t.Description,
+                CreatedAt = t.CreatedAt,
+                UpdatedAt = t.UpdatedAt,
+                DeletedAt = t.DeletedAt,
+                Status = t.Status.Name,
+                Assignee = t.Assignee == null
+                    ? null
+                    : new UserDto
+                    {
+                        Id = t.Assignee.Id,
+                        Username = t.Assignee.Username
+                    }
+            })
+            .ToListAsync();
+    }
+
+    [HttpPatch(nameof(ArchiveTask))]
+    public async Task<IActionResult> ArchiveTask([FromQuery] string id)
+    {
+        if (!Guid.TryParse(id, out var taskId))
+            return BadRequest(InvalidTaskIdMessage);
+
+        var task = await ctx.TaskItems.FirstOrDefaultAsync(t => t.Id == taskId);
+
+        if (task == null)
+            return NotFound();
+
+        if (task.DeletedAt != null)
+            return BadRequest("Task is already archived.");
+
+        task.DeletedAt = DateTime.UtcNow;
+        await ctx.SaveChangesAsync();
+
+        var saveHistory = new SaveTaskToHistory(ctx);
+        var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
+        await saveHistory.OnDelete(task.Id, systemUser.Id, task.DeletedAt.Value);
+
+        return NoContent();
+    }
+
+    [HttpPatch(nameof(UnarchiveTask))]
+    public async Task<IActionResult> UnarchiveTask([FromQuery] string id)
+    {
+        if (!Guid.TryParse(id, out var taskId))
+            return BadRequest(InvalidTaskIdMessage);
+
+        var task = await ctx.TaskItems.FirstOrDefaultAsync(t => t.Id == taskId);
+
+        if (task == null)
+            return NotFound();
+
+        if (task.DeletedAt == null)
+            return BadRequest("Task is not archived.");
+
+        var archivedAt = task.DeletedAt.Value;
+        task.DeletedAt = null;
+        await ctx.SaveChangesAsync();
+
+        var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
+        ctx.TaskDetailHistories.Add(new TaskDetailHistory
+        {
+            TaskId = task.Id,
+            FieldName = "DeletedAt",
+            OldValue = archivedAt.ToString("o"),
+            NewValue = null,
+            ChangedBy = systemUser.Id,
+            ChangedAt = DateTime.UtcNow
+        });
+        await ctx.SaveChangesAsync();
+
+        return NoContent();
+    }
+        
+    [HttpPatch(nameof(AssignTask))]
+    public async Task<ActionResult<TaskDto>> AssignTask([FromQuery] string taskId, [FromQuery] string assigneeId)
+    {
+        if (!Guid.TryParse(taskId, out var parsedTaskId))
+            return BadRequest("Invalid task id.");
+
+        if (!Guid.TryParse(assigneeId, out var parsedAssigneeId))
+            return BadRequest("Invalid assignee id.");
+
+        var task = await ctx.TaskItems
+            .Include(t => t.Status)
+            .FirstOrDefaultAsync(t => t.Id == parsedTaskId && t.DeletedAt == null);
+
+        if (task == null)
+            return NotFound($"Task not found with id: '{taskId}'");
+
+        var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == parsedAssigneeId && u.DeletedAt == null);
+        if (user == null)
+            return NotFound($"Assignee not found with id: '{assigneeId}'");
+
+        task.AssigneeId = user.Id;
+        task.Assignee = user;
+        await ctx.SaveChangesAsync();
+
+        return Ok(MapToTaskDto(task));
+    }
+
     [HttpDelete(nameof(DeleteTask))]
     public async Task<IActionResult> DeleteTask([FromQuery] string id)
     {
@@ -325,4 +411,20 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         var systemUser = await ctx.Users.FirstOrDefaultAsync(u => u.Username == "system" && u.DeletedAt == null);
         return systemUser ?? throw new KeyNotFoundException("System user not found.");
     }
+    
+    [HttpGet(nameof(GetTasks))]
+    public async Task<ActionResult<List<TaskDto>>> GetTasks([FromQuery] TaskQueryParameters query)
+    {
+        try
+        {
+            var tasks = await taskService.GetTasksByQueryAsync(query);
+            return Ok(tasks);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
 }
+    
+    
