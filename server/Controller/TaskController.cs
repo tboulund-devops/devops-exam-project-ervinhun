@@ -322,6 +322,31 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         await ctx.SaveChangesAsync();
 
         return NoContent();
+    [HttpPatch(nameof(AssignTask))]
+    public async Task<ActionResult<TaskDto>> AssignTask([FromQuery] string taskId, [FromQuery] string assigneeId)
+    {
+        if (!Guid.TryParse(taskId, out var parsedTaskId))
+            return BadRequest("Invalid task id.");
+
+        if (!Guid.TryParse(assigneeId, out var parsedAssigneeId))
+            return BadRequest("Invalid assignee id.");
+
+        var task = await ctx.TaskItems
+            .Include(t => t.Status)
+            .FirstOrDefaultAsync(t => t.Id == parsedTaskId && t.DeletedAt == null);
+
+        if (task == null)
+            return NotFound($"Task not found with id: '{taskId}'");
+
+        var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == parsedAssigneeId && u.DeletedAt == null);
+        if (user == null)
+            return NotFound($"Assignee not found with id: '{assigneeId}'");
+
+        task.AssigneeId = user.Id;
+        task.Assignee = user;
+        await ctx.SaveChangesAsync();
+
+        return Ok(MapToTaskDto(task));
     }
 
     [HttpDelete(nameof(DeleteTask))]
