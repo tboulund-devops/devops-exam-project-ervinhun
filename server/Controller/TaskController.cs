@@ -229,21 +229,31 @@ public class TaskController(MyDbContext ctx) : ControllerBase
         task.Title = request.Title.Trim();
         task.Description = request.Description?.Trim();
 
-        if (request.AssigneeId != null && request.AssigneeId != task.AssigneeId)
+        if (request.AssigneeId.HasValue)
         {
-            var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == request.AssigneeId && u.DeletedAt == null);
-            if (user == null)
+            // Only change the assignee if the client explicitly provided a value.
+            // Guid.Empty is treated as an explicit "unassign" request.
+            if (request.AssigneeId == task.AssigneeId)
             {
-                return NotFound("User not found with id: " + request.AssigneeId);
+                // No change in assignee requested.
             }
-            task.AssigneeId = request.AssigneeId;
-            task.Assignee = user;
-        }
-
-        if (request.AssigneeId == null)
-        {
-            task.AssigneeId = null;
-            task.Assignee = null;
+            else if (request.AssigneeId == Guid.Empty)
+            {
+                // Explicitly unassign the task.
+                task.AssigneeId = null;
+                task.Assignee = null;
+            }
+            else
+            {
+                var user = await ctx.Users
+                    .FirstOrDefaultAsync(u => u.Id == request.AssigneeId && u.DeletedAt == null);
+                if (user == null)
+                {
+                    return NotFound("User not found with id: " + request.AssigneeId);
+                }
+                task.AssigneeId = request.AssigneeId;
+                task.Assignee = user;
+            }
         }
 
         await using var updateTransaction = await ctx.Database.BeginTransactionAsync();
@@ -260,6 +270,33 @@ public class TaskController(MyDbContext ctx) : ControllerBase
             await updateTransaction.RollbackAsync();
             throw;
         }
+        return Ok(MapToTaskDto(task));
+    }
+
+    [HttpPatch(nameof(AssignTask))]
+    public async Task<ActionResult<TaskDto>> AssignTask([FromQuery] string taskId, [FromQuery] string assigneeId)
+    {
+        if (!Guid.TryParse(taskId, out var parsedTaskId))
+            return BadRequest("Invalid task id.");
+
+        if (!Guid.TryParse(assigneeId, out var parsedAssigneeId))
+            return BadRequest("Invalid assignee id.");
+
+        var task = await ctx.TaskItems
+            .Include(t => t.Status)
+            .FirstOrDefaultAsync(t => t.Id == parsedTaskId && t.DeletedAt == null);
+
+        if (task == null)
+            return NotFound($"Task not found with id: '{taskId}'");
+
+        var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == parsedAssigneeId && u.DeletedAt == null);
+        if (user == null)
+            return NotFound($"Assignee not found with id: '{assigneeId}'");
+
+        task.AssigneeId = user.Id;
+        task.Assignee = user;
+        await ctx.SaveChangesAsync();
+
         return Ok(MapToTaskDto(task));
     }
 
@@ -321,7 +358,7 @@ public class TaskController(MyDbContext ctx) : ControllerBase
 
     private async Task<User> GetSystemUserBeforeWeImplementAuthentication()
     {
-        var systemUser = await ctx.Users.FirstOrDefaultAsync(u => u.Username == "system");
+        var systemUser = await ctx.Users.FirstOrDefaultAsync(u => u.Username == "system" && u.DeletedAt == null);
         return systemUser ?? throw new KeyNotFoundException("System user not found.");
     }
 }
