@@ -381,6 +381,191 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
         detailHistory.Count(h => h.FieldName == "DeletedAt").Should().Be(1);
     }
 
+    [Fact]
+    [DisplayName("GetArchivedTasks returns empty list when no tasks are archived")]
+    public async Task GetArchivedTasks_NoArchivedTasks_ReturnsEmpty()
+    {
+        var response = await _client.GetAsync("/api/Task/GetArchivedTasks");
+
+        response.IsSuccessStatusCode.Should().BeTrue();
+        var tasks = await response.Content.ReadFromJsonAsync<List<TaskDto>>();
+        tasks.Should().NotBeNull();
+        tasks.Should().NotContain(t => t.DeletedAt == null, "because all returned tasks must be archived");
+    }
+
+    [Fact]
+    [DisplayName("GetArchivedTasks returns task after it is archived")]
+    public async Task GetArchivedTasks_AfterArchiving_ReturnsArchivedTask()
+    {
+        var createdTask = await CreateTaskOrThrow("Archive me", "Archive test");
+
+        var archiveResponse = await _client.PatchAsync($"/api/Task/ArchiveTask?id={createdTask.Id}", null);
+        archiveResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
+
+        var response = await _client.GetAsync("/api/Task/GetArchivedTasks");
+        response.IsSuccessStatusCode.Should().BeTrue();
+        var tasks = await response.Content.ReadFromJsonAsync<List<TaskDto>>();
+        tasks.Should().NotBeNull();
+        tasks.Should().Contain(t => t.Id == createdTask.Id);
+        tasks.Should().OnlyContain(t => t.DeletedAt != null, "because all returned tasks must have DeletedAt set");
+    }
+
+    [Fact]
+    [DisplayName("ArchiveTask with valid id returns NoContent and hides task from GetTasks")]
+    public async Task ArchiveTask_ValidId_HidesTaskFromGetTasks()
+    {
+        var createdTask = await CreateTaskOrThrow("Archive hide me", "Archive hide test");
+
+        var archiveResponse = await _client.PatchAsync($"/api/Task/ArchiveTask?id={createdTask.Id}", null);
+        archiveResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
+
+        var tasksResponse = await _client.GetAsync("/api/Task/GetTasks");
+        tasksResponse.IsSuccessStatusCode.Should().BeTrue();
+        var tasks = await tasksResponse.Content.ReadFromJsonAsync<List<TaskDto>>();
+        tasks.Should().NotBeNull();
+        tasks.Should().NotContain(t => t.Id == createdTask.Id);
+    }
+
+    [Fact]
+    [DisplayName("ArchiveTask with valid id writes DeletedAt history entry")]
+    public async Task ArchiveTask_ValidId_WritesDeletedAtHistory()
+    {
+        var createdTask = await CreateTaskOrThrow("Archive history", "Archive history test");
+        var systemUserId = await GetSystemUserId();
+
+        var archiveResponse = await _client.PatchAsync($"/api/Task/ArchiveTask?id={createdTask.Id}", null);
+        archiveResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
+
+        var detailHistory = await GetTaskDetailHistory(createdTask.Id);
+        detailHistory.Should().ContainSingle(h =>
+            h.FieldName == "DeletedAt" &&
+            h.OldValue == null &&
+            h.ChangedBy == systemUserId);
+
+        var archiveEntry = detailHistory.Single(h => h.FieldName == "DeletedAt");
+        archiveEntry.NewValue.Should().NotBeNullOrWhiteSpace();
+        DateTimeOffset.TryParse(archiveEntry.NewValue, out _)
+            .Should().BeTrue("because archive history NewValue should be an ISO timestamp");
+    }
+
+    [Fact]
+    [DisplayName("ArchiveTask with invalid id returns BadRequest")]
+    public async Task ArchiveTask_InvalidId_ReturnsBadRequest()
+    {
+        var response = await _client.PatchAsync("/api/Task/ArchiveTask?id=invalid-id", null);
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Be("Invalid task id.");
+    }
+
+    [Fact]
+    [DisplayName("ArchiveTask with unknown id returns NotFound")]
+    public async Task ArchiveTask_UnknownId_ReturnsNotFound()
+    {
+        var response = await _client.PatchAsync($"/api/Task/ArchiveTask?id={Guid.NewGuid()}", null);
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    [DisplayName("ArchiveTask called twice returns BadRequest second time")]
+    public async Task ArchiveTask_Twice_ReturnsBadRequestSecondTime()
+    {
+        var createdTask = await CreateTaskOrThrow("Archive twice", "Archive twice test");
+
+        var firstResponse = await _client.PatchAsync($"/api/Task/ArchiveTask?id={createdTask.Id}", null);
+        firstResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
+
+        var secondResponse = await _client.PatchAsync($"/api/Task/ArchiveTask?id={createdTask.Id}", null);
+        secondResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    [DisplayName("UnarchiveTask restores task and it appears in GetTasks again")]
+    public async Task UnarchiveTask_ValidId_RestoresTaskInGetTasks()
+    {
+        var createdTask = await CreateTaskOrThrow("Unarchive me", "Unarchive test");
+
+        var archiveResponse = await _client.PatchAsync($"/api/Task/ArchiveTask?id={createdTask.Id}", null);
+        archiveResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
+
+        var unarchiveResponse = await _client.PatchAsync($"/api/Task/UnarchiveTask?id={createdTask.Id}", null);
+        unarchiveResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
+
+        var tasksResponse = await _client.GetAsync("/api/Task/GetTasks");
+        tasksResponse.IsSuccessStatusCode.Should().BeTrue();
+        var tasks = await tasksResponse.Content.ReadFromJsonAsync<List<TaskDto>>();
+        tasks.Should().NotBeNull();
+        tasks.Should().Contain(t => t.Id == createdTask.Id);
+    }
+
+    [Fact]
+    [DisplayName("UnarchiveTask removes task from GetArchivedTasks")]
+    public async Task UnarchiveTask_ValidId_RemovesFromArchivedTasks()
+    {
+        var createdTask = await CreateTaskOrThrow("Unarchive from list", "Unarchive list test");
+
+        await _client.PatchAsync($"/api/Task/ArchiveTask?id={createdTask.Id}", null);
+        await _client.PatchAsync($"/api/Task/UnarchiveTask?id={createdTask.Id}", null);
+
+        var response = await _client.GetAsync("/api/Task/GetArchivedTasks");
+        var tasks = await response.Content.ReadFromJsonAsync<List<TaskDto>>();
+        tasks.Should().NotBeNull();
+        tasks.Should().NotContain(t => t.Id == createdTask.Id);
+    }
+
+    [Fact]
+    [DisplayName("UnarchiveTask writes DeletedAt null history entry")]
+    public async Task UnarchiveTask_ValidId_WritesUnarchiveHistory()
+    {
+        var createdTask = await CreateTaskOrThrow("Unarchive history", "Unarchive history test");
+        var systemUserId = await GetSystemUserId();
+
+        await _client.PatchAsync($"/api/Task/ArchiveTask?id={createdTask.Id}", null);
+        var unarchiveResponse = await _client.PatchAsync($"/api/Task/UnarchiveTask?id={createdTask.Id}", null);
+        unarchiveResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
+
+        var detailHistory = await GetTaskDetailHistory(createdTask.Id);
+        detailHistory.Should().Contain(h =>
+            h.FieldName == "DeletedAt" &&
+            h.NewValue == null &&
+            h.OldValue != null &&
+            h.ChangedBy == systemUserId,
+            "because unarchive should record a DeletedAt -> null entry in history");
+    }
+
+    [Fact]
+    [DisplayName("UnarchiveTask with invalid id returns BadRequest")]
+    public async Task UnarchiveTask_InvalidId_ReturnsBadRequest()
+    {
+        var response = await _client.PatchAsync("/api/Task/UnarchiveTask?id=invalid-id", null);
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Be("Invalid task id.");
+    }
+
+    [Fact]
+    [DisplayName("UnarchiveTask with unknown id returns NotFound")]
+    public async Task UnarchiveTask_UnknownId_ReturnsNotFound()
+    {
+        var response = await _client.PatchAsync($"/api/Task/UnarchiveTask?id={Guid.NewGuid()}", null);
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    [DisplayName("UnarchiveTask on non-archived task returns BadRequest")]
+    public async Task UnarchiveTask_NotArchived_ReturnsBadRequest()
+    {
+        var createdTask = await CreateTaskOrThrow("Not archived", "Not archived test");
+
+        var response = await _client.PatchAsync($"/api/Task/UnarchiveTask?id={createdTask.Id}", null);
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+    }
+
     private async Task<TaskDto> CreateTaskOrThrow(string title, string? description)
     {
         var response = await _client.PostAsJsonAsync("/api/Task/CreateTask", new CreateTaskRequest
