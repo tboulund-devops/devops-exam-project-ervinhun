@@ -444,16 +444,22 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
         body.Should().Be("Only tasks with status 'Done' can be reopened.");
     }
 
-    [Fact]
+[Fact]
     [DisplayName("ReopenTask with invalid id returns BadRequest")]
     public async Task ReopenTask_InvalidId_ReturnsBadRequest()
     {
         var response = await _client.PostAsync("/api/Task/ReopenTask?id=invalid-id", null);
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Be("Invalid task id.");
+    }
+
+    [Fact]
     [DisplayName("GetArchivedTasks returns empty list when no tasks are archived")]
     public async Task GetArchivedTasks_NoArchivedTasks_ReturnsEmpty()
     {
         var response = await _client.GetAsync("/api/Task/GetArchivedTasks");
-
         response.IsSuccessStatusCode.Should().BeTrue();
         var tasks = await response.Content.ReadFromJsonAsync<List<TaskDto>>();
         tasks.Should().NotBeNull();
@@ -602,12 +608,11 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
             "because unarchive should record a DeletedAt -> null entry in history");
     }
 
-    [Fact]
+   [Fact]
     [DisplayName("UnarchiveTask with invalid id returns BadRequest")]
     public async Task UnarchiveTask_InvalidId_ReturnsBadRequest()
     {
         var response = await _client.PatchAsync("/api/Task/UnarchiveTask?id=invalid-id", null);
-
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
         var body = await response.Content.ReadAsStringAsync();
         body.Should().Be("Invalid task id.");
@@ -618,14 +623,18 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
     public async Task ReopenTask_UnknownId_ReturnsNotFound()
     {
         var response = await _client.PostAsync($"/api/Task/ReopenTask?id={Guid.NewGuid()}", null);
-    [DisplayName("UnarchiveTask with unknown id returns NotFound")]
-    public async Task UnarchiveTask_UnknownId_ReturnsNotFound()
-    {
-        var response = await _client.PatchAsync($"/api/Task/UnarchiveTask?id={Guid.NewGuid()}", null);
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
     }
 
+    [Fact]
+    [DisplayName("UnarchiveTask with unknown id returns NotFound")]
+    public async Task UnarchiveTask_UnknownId_ReturnsNotFound()
+    {
+        var response = await _client.PatchAsync($"/api/Task/UnarchiveTask?id={Guid.NewGuid()}", null);
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+    }
+    
     [Fact]
     [DisplayName("UnarchiveTask on non-archived task returns BadRequest")]
     public async Task UnarchiveTask_NotArchived_ReturnsBadRequest()
