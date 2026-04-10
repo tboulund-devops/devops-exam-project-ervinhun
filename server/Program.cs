@@ -12,26 +12,9 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        if (builder.Environment.IsDevelopment())
-        {
-            policy.AllowAnyOrigin()
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        }
-        else
-        {
-            var allowedOrigins = builder.Configuration["ALLOWED_ORIGINS"];
-            if (!string.IsNullOrWhiteSpace(allowedOrigins))
-            {
-                policy.WithOrigins(allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                      .AllowAnyHeader()
-                      .AllowAnyMethod();
-            }
-            else
-            {
-                throw new InvalidOperationException("In non-development environments, ALLOWED_ORIGINS must be set to a non-empty comma-separated list of origins for CORS.");
-            }
-        }
+        policy.AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod();
     });
 });
 
@@ -75,4 +58,4 @@ app.MapControllers();
 app.UseOpenApi();
 app.UseSwaggerUi();
 
-app.Run();
+await app.RunAsync();
