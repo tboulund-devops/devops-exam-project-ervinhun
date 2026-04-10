@@ -1,8 +1,20 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using server.DataAccess;
+using System;
+using System.Linq;
 
 namespace server.Controller;
+
+public sealed class TaskHistoryDto
+{
+    public DateTime ChangedAt { get; set; }
+}
+
+public sealed class TaskDetailHistoryDto
+{
+    public DateTime ChangedAt { get; set; }
+}
 
 [ApiController]
 [Route("api/[controller]")]
@@ -23,7 +35,8 @@ public class HistoryController(MyDbContext ctx) : ControllerBase
         var size = Math.Min(pageSize is > 0 ? pageSize.Value : DefaultPageSize, MaxPageSize);
         query = query.Skip((page - 1) * size).Take(size);
 
-        var result = await query.ToListAsync();
+        var result = await query
+            .ToListAsync();
         return Ok(result);
     }
 
@@ -39,7 +52,8 @@ public class HistoryController(MyDbContext ctx) : ControllerBase
         var size = Math.Min(pageSize is > 0 ? pageSize.Value : DefaultPageSize, MaxPageSize);
         query = query.Skip((page - 1) * size).Take(size);
 
-        var result = await query.ToListAsync();
+        var result = await query
+            .ToListAsync();
         return Ok(result);
     }
 }
