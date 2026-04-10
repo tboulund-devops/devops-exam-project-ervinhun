@@ -46,6 +46,7 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
                     }
             })
             .FirstOrDefaultAsync();
+
         if (task == null)
         {
             return NotFound($"Task not found with id: '{id}'");
@@ -78,12 +79,10 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
 
         var oldStatus = task.Status;
 
-        // Update task
         task.StatusId = newStatus.Id;
         task.Status = newStatus;
         await ctx.SaveChangesAsync();
 
-        // Save history
         var saveHistory = new SaveTaskToHistory(ctx);
         await saveHistory.OnStatusChange(task, oldStatus.Id, newStatus.Id, request.ChangedByUserId);
 
@@ -93,25 +92,29 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
     [HttpPost(nameof(CreateTask))]
     public async Task<ActionResult<TaskDto>> CreateTask([FromBody] CreateTaskRequest request)
     {
-        var defaultStatus = await ctx.TodoTaskStatuses.Where(s => s.Name == "Backlog")
+        var defaultStatus = await ctx.TodoTaskStatuses
+            .Where(s => s.Name == "To-do")
             .FirstOrDefaultAsync();
+
         if (defaultStatus == null)
         {
-            var backlogStatus = new TodoTaskStatus()
+            var todoStatus = new TodoTaskStatus()
             {
-                Name = "Backlog",
+                Name = "To-do",
                 CreatedAt = DateTime.UtcNow,
                 DeletedAt = null
             };
-            await ctx.TodoTaskStatuses.AddAsync(backlogStatus);
+            await ctx.TodoTaskStatuses.AddAsync(todoStatus);
             await ctx.SaveChangesAsync();
-            defaultStatus = backlogStatus;
+            defaultStatus = todoStatus;
         }
 
         User? user = null;
         if (request.AssigneeId != null)
         {
-            user = await ctx.Users.Where(u => u.Id == request.AssigneeId && u.DeletedAt == null).FirstOrDefaultAsync();
+            user = await ctx.Users
+                .Where(u => u.Id == request.AssigneeId && u.DeletedAt == null)
+                .FirstOrDefaultAsync();
             if (user == null)
             {
                 return NotFound($"Assignee not found with id: '{request.AssigneeId}'");
@@ -338,7 +341,6 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
             return BadRequest("Task is already deleted.");
 
         task.DeletedAt = DateTime.UtcNow;
-
         await ctx.SaveChangesAsync();
         var saveHistory = new SaveTaskToHistory(ctx);
         var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
