@@ -12,6 +12,7 @@ namespace server.Controller;
 public class TaskController(MyDbContext ctx, ITaskService taskService ) : ControllerBase
 {
     private const string InvalidTaskIdMessage = "Invalid task id.";
+
     [HttpGet("Users")]
     public async Task<IActionResult> GetUsers()
     {
@@ -346,6 +347,41 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
         var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
         await saveHistory.OnDelete(task.Id, systemUser.Id, task.DeletedAt.Value);
         return NoContent(); // 204
+    }
+
+    [HttpPost(nameof(ReopenTask))]
+    public async Task<ActionResult<TaskDto>> ReopenTask([FromQuery] string id)
+    {
+        if (!Guid.TryParse(id, out var taskId))
+            return BadRequest(InvalidTaskIdMessage);
+
+        var task = await ctx.TaskItems
+            .Include(t => t.Assignee)
+            .Include(t => t.Status)
+            .FirstOrDefaultAsync(t => t.Id == taskId && t.DeletedAt == null);
+
+        if (task == null)
+            return NotFound();
+
+        if (task.Status.Name != "Done")
+            return BadRequest("Only tasks with status 'Done' can be reopened.");
+
+        var todoStatus = await ctx.TodoTaskStatuses
+            .FirstOrDefaultAsync(s => s.Name == "To-do" && s.DeletedAt == null);
+
+        if (todoStatus == null)
+            return StatusCode(500, "Status 'To-do' not found.");
+
+        var oldStatus = task.Status;
+        task.StatusId = todoStatus.Id;
+        task.Status = todoStatus;
+        await ctx.SaveChangesAsync();
+
+        var saveHistory = new SaveTaskToHistory(ctx);
+        var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
+        await saveHistory.OnStatusChange(task, oldStatus.Id, todoStatus.Id, systemUser.Id);
+
+        return Ok(MapToTaskDto(task));
     }
 
     private TaskDto MapToTaskDto(TaskItem task)

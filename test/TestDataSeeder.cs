@@ -35,6 +35,18 @@ internal static class TestDataSeeder
             db.TodoTaskStatuses.Add(backlogStatus);
         }
 
+        foreach (var statusName in new[] { "To-do", "Doing", "Review", "Done" })
+        {
+            if (!db.TodoTaskStatuses.Any(s => s.Name == statusName))
+            {
+                db.TodoTaskStatuses.Add(new TodoTaskStatus
+                {
+                    Name = statusName,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+        }
+
         db.SaveChanges();
 
         var testUserId = db.Users

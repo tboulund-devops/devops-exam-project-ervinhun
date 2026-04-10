@@ -382,11 +382,84 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
     }
 
     [Fact]
+    [DisplayName("ReopenTask moves task from Done to To-do")]
+    public async Task ReopenTask_ValidId_MovesTaskToTodo()
+    {
+        var createdTask = await CreateTaskOrThrow("Reopen me", "Reopen test");
+        var doneStatusId = await EnsureStatus("Done");
+        var changedBy = await GetSystemUserId();
+
+        await _client.PostAsJsonAsync("/api/Task/MoveTask", new MoveTaskRequest
+        {
+            TaskId = createdTask.Id,
+            NewStatusId = doneStatusId,
+            ChangedByUserId = changedBy
+        });
+
+        var response = await _client.PostAsync($"/api/Task/ReopenTask?id={createdTask.Id}", null);
+        var error = await response.Content.ReadAsStringAsync();
+        response.IsSuccessStatusCode.Should().BeTrue($"because reopen should succeed, but got: {error}");
+
+        var reopenedTask = await response.Content.ReadFromJsonAsync<TaskDto>();
+        reopenedTask.Should().NotBeNull();
+        reopenedTask.Status.Should().Be("To-do");
+    }
+
+    [Fact]
+    [DisplayName("ReopenTask writes status change to history")]
+    public async Task ReopenTask_ValidId_WritesStatusHistory()
+    {
+        var createdTask = await CreateTaskOrThrow("Reopen history", "Reopen history test");
+        var doneStatusId = await EnsureStatus("Done");
+        var todoStatusId = await EnsureStatus("To-do");
+        var changedBy = await GetSystemUserId();
+
+        await _client.PostAsJsonAsync("/api/Task/MoveTask", new MoveTaskRequest
+        {
+            TaskId = createdTask.Id,
+            NewStatusId = doneStatusId,
+            ChangedByUserId = changedBy
+        });
+
+        var response = await _client.PostAsync($"/api/Task/ReopenTask?id={createdTask.Id}", null);
+        response.IsSuccessStatusCode.Should().BeTrue();
+
+        var statusHistory = await GetTaskHistory(createdTask.Id);
+        statusHistory.Should().Contain(h =>
+            h.FromStatusId == doneStatusId &&
+            h.ToStatusId == todoStatusId,
+            "because reopen should record Done -> To-do in history");
+    }
+
+    [Fact]
+    [DisplayName("ReopenTask on non-Done task returns BadRequest")]
+    public async Task ReopenTask_NotDoneStatus_ReturnsBadRequest()
+    {
+        var createdTask = await CreateTaskOrThrow("Not done", "Not done test");
+
+        var response = await _client.PostAsync($"/api/Task/ReopenTask?id={createdTask.Id}", null);
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Be("Only tasks with status 'Done' can be reopened.");
+    }
+
+[Fact]
+    [DisplayName("ReopenTask with invalid id returns BadRequest")]
+    public async Task ReopenTask_InvalidId_ReturnsBadRequest()
+    {
+        var response = await _client.PostAsync("/api/Task/ReopenTask?id=invalid-id", null);
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Be("Invalid task id.");
+    }
+
+    [Fact]
     [DisplayName("GetArchivedTasks returns empty list when no tasks are archived")]
     public async Task GetArchivedTasks_NoArchivedTasks_ReturnsEmpty()
     {
         var response = await _client.GetAsync("/api/Task/GetArchivedTasks");
-
         response.IsSuccessStatusCode.Should().BeTrue();
         var tasks = await response.Content.ReadFromJsonAsync<List<TaskDto>>();
         tasks.Should().NotBeNull();
@@ -535,15 +608,23 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
             "because unarchive should record a DeletedAt -> null entry in history");
     }
 
-    [Fact]
+   [Fact]
     [DisplayName("UnarchiveTask with invalid id returns BadRequest")]
     public async Task UnarchiveTask_InvalidId_ReturnsBadRequest()
     {
         var response = await _client.PatchAsync("/api/Task/UnarchiveTask?id=invalid-id", null);
-
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
         var body = await response.Content.ReadAsStringAsync();
         body.Should().Be("Invalid task id.");
+    }
+
+    [Fact]
+    [DisplayName("ReopenTask with unknown id returns NotFound")]
+    public async Task ReopenTask_UnknownId_ReturnsNotFound()
+    {
+        var response = await _client.PostAsync($"/api/Task/ReopenTask?id={Guid.NewGuid()}", null);
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -551,10 +632,9 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
     public async Task UnarchiveTask_UnknownId_ReturnsNotFound()
     {
         var response = await _client.PatchAsync($"/api/Task/UnarchiveTask?id={Guid.NewGuid()}", null);
-
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
     }
-
+    
     [Fact]
     [DisplayName("UnarchiveTask on non-archived task returns BadRequest")]
     public async Task UnarchiveTask_NotArchived_ReturnsBadRequest()
