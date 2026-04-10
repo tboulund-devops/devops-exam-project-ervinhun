@@ -12,10 +12,7 @@ namespace server.Controller;
 public class TaskController(MyDbContext ctx, ITaskService taskService ) : ControllerBase
 {
     private const string InvalidTaskIdMessage = "Invalid task id.";
-<<<<<<< feature/DEV-33
 
-=======
->>>>>>> dev
     [HttpGet("Users")]
     public async Task<IActionResult> GetUsers()
     {
