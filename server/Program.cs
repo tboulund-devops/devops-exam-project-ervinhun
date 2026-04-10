@@ -27,6 +27,10 @@ builder.Services.AddCors(options =>
                       .AllowAnyHeader()
                       .AllowAnyMethod();
             }
+            else
+            {
+                throw new InvalidOperationException("In non-development environments, ALLOWED_ORIGINS must be set to a non-empty comma-separated list of origins for CORS.");
+            }
         }
     });
 });
