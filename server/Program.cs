@@ -1,9 +1,13 @@
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using server.DataAccess;
+using server.Utils;
+using server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
+
+builder.Services.AddScoped<ITaskService, TaskService>();
 
 // Add CORS
 builder.Services.AddCors(options =>
