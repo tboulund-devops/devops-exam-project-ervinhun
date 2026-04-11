@@ -8,6 +8,7 @@ namespace server.Utils;
 public static class DatabaseSeeder
 {
     public static async Task InitializeAsync(IServiceProvider services,
+        ConfigurationManager builderConfiguration,
         string connectionString)
     {
         using var scope = services.CreateScope();

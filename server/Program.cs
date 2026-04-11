@@ -60,4 +60,4 @@ app.MapControllers();
 app.UseOpenApi();
 app.UseSwaggerUi();
 
-app.Run();
+await app.RunAsync();
