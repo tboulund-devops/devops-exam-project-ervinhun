@@ -19,6 +19,23 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
         return Ok(await ctx.Users.ToListAsync());
     }
 
+    [HttpGet("Statuses")]
+    public async Task<IActionResult> GetStatuses()
+    {
+        var statuses = await ctx.TodoTaskStatuses
+            .Where(s => s.DeletedAt == null)
+            .OrderBy(s => s.Name)
+            .Select(s => new 
+            {
+                s.Id,
+                s.Name,
+                s.CreatedAt
+            })
+            .ToListAsync();
+        
+        return Ok(statuses);
+    }
+
     [HttpGet(nameof(GetTaskById))]
     public async Task<ActionResult<TaskDto>> GetTaskById([FromQuery] string id)
     {
@@ -425,5 +442,3 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
         }
     }
 }
-    
-    
