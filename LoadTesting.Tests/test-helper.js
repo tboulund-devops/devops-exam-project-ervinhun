@@ -47,7 +47,13 @@ export function callEndpoint(endpoint, existingTaskIds) {
         });
         res = http.post(url, payload, params);
         // Delete after creation if backend allows
-        http.del(`${BASE_URL}/api/Task/DeleteTask?id=${res.json().id}`, params);
+        if (res && (res.status === 200 || res.status === 201)) {
+            let createdTask = null;
+            try { createdTask = res.json(); } catch(e) { createdTask = null; }
+            if (createdTask && createdTask.id) {
+                http.del(`${BASE_URL}/api/Task/DeleteTask?id=${createdTask.id}`, params);
+            }
+        }
     } else return null;
 
     let data;
