@@ -67,23 +67,39 @@ public class CustomWebApplicationFactory : WebApplicationFactory<server.Program>
 
     private static void ApplyDatabaseSchema(MyDbContext db)
     {
-        // Prefer applying the same schema.sql used in production so that tests
-        // see the same triggers, functions, indexes, etc. If schema.sql is not
-        // available, fall back to EnsureCreated() to preserve existing behavior.
+        // Apply the Flyway migration SQL files so tests use the same schema path
+        // as deployment.
         var baseDirectory = AppContext.BaseDirectory;
-        var schemaPath = Path.Combine(baseDirectory, "DataAccess", "schema.sql");
+        var migrationsPath = Path.Combine(baseDirectory, "flyway", "migrations");
 
-        if (File.Exists(schemaPath))
+        if (Directory.Exists(migrationsPath))
         {
-            var sql = File.ReadAllText(schemaPath);
-            if (!string.IsNullOrWhiteSpace(sql))
+            var scripts = Directory.GetFiles(migrationsPath, "*.sql", SearchOption.TopDirectoryOnly)
+                .OrderBy(static file =>
+                {
+                    var name = Path.GetFileName(file);
+                    if (name.StartsWith("V", StringComparison.OrdinalIgnoreCase)) return 0;
+                    if (name.StartsWith("R", StringComparison.OrdinalIgnoreCase)) return 1;
+                    return 2;
+                })
+                .ThenBy(static file => Path.GetFileName(file), StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            foreach (var scriptPath in scripts)
             {
-                db.Database.ExecuteSqlRaw(sql);
+                var sql = File.ReadAllText(scriptPath);
+                if (!string.IsNullOrWhiteSpace(sql))
+                {
+                    db.Database.ExecuteSqlRaw(sql);
+                }
+            }
+
+            if (scripts.Count > 0)
+            {
+                return;
             }
         }
-        else
-        {
-            db.Database.EnsureCreated();
-        }
+
+        db.Database.EnsureCreated();
     }
 }
