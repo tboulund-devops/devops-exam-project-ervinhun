@@ -21,7 +21,7 @@ jobs:
             -url="${{ secrets.STAGING_DB_URL }}" \
             -user="${{ secrets.STAGING_DB_USER }}" \
             -password="${{ secrets.STAGING_DB_PASSWORD }}" \
-            -baselineOnMigrate=true \
+            -baselineOnMigrate=true -baselineVersion=0 \
             -connectRetries=60 \
             migrate
 
@@ -45,6 +45,7 @@ jobs:
       - name: Run one E2E core feature test
         run: dotnet test ./test/test.csproj --no-build --configuration Release --filter "FullyQualifiedName~TaskControllerTests.MoveTask_ValidData_WritesStatusHistory"
 
+  
 
   migrate-db-production:
     if: ${{ github.ref_name == 'main' }}
@@ -62,7 +63,7 @@ jobs:
             -url="${{ secrets.PRODUCTION_DB_URL }}" \
             -user="${{ secrets.PRODUCTION_DB_USER }}" \
             -password="${{ secrets.PRODUCTION_DB_PASSWORD }}" \
-            -baselineOnMigrate=true \
+            -baselineOnMigrate=true -baselineVersion=0 \
             -connectRetries=60 \
             migrate
 
