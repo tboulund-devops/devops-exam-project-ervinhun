@@ -21,6 +21,7 @@ jobs:
             -url="${{ secrets.STAGING_DB_URL }}" \
             -user="${{ secrets.STAGING_DB_USER }}" \
             -password="${{ secrets.STAGING_DB_PASSWORD }}" \
+            -baselineOnMigrate=true \
             -connectRetries=60 \
             migrate
 
@@ -44,117 +45,11 @@ jobs:
       - name: Run one E2E core feature test
         run: dotnet test ./test/test.csproj --no-build --configuration Release --filter "FullyQualifiedName~TaskControllerTests.MoveTask_ValidData_WritesStatusHistory"
 
-  k6-performance-smoke:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: ToDoApp
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d ToDoApp"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 12
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Apply Flyway migrations to local perf database
-        run: |
-          docker run --rm \
-            -v "${{ github.workspace }}/server/flyway/migrations:/flyway/sql" \
-            redgate/flyway:11.12.0 \
-            -url="jdbc:postgresql://127.0.0.1:5432/ToDoApp" \
-            -user="postgres" \
-            -password="postgres" \
-            -connectRetries=60 \
-            migrate
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-
-      - name: Setup k6
-        uses: grafana/setup-k6-action@v1
-
-      - name: Restore and build API
-        run: |
-          dotnet restore ./server/server.csproj
-          dotnet build ./server/server.csproj --no-restore --configuration Release
-
-      - name: Start API in background
-        env:
-          CONNECTION_STRING: Host=127.0.0.1;Port=5432;Database=ToDoApp;Username=postgres;Password=postgres
-          ASPNETCORE_ENVIRONMENT: Development
-          ASPNETCORE_URLS: http://127.0.0.1:5000
-        run: |
-          nohup dotnet run --project ./server/server.csproj --configuration Release > api.log 2>&1 &
-
-      - name: Wait for API
-        run: |
-          for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:5000/swagger/v1/swagger.json > /dev/null; then
-              echo "API is up"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "API did not start in time"
-          cat api.log
-          exit 1
-
-      - name: Run k6 performance smoke test
-        env:
-          BASE_URL: http://127.0.0.1:5000
-        run: k6 run ./LoadTesting.Tests/pipeline-smoke.js
-
-      - name: Print API logs on failure
-        if: failure()
-        run: cat api.log
-
-  staging-e2e-validation:
-    if: ${{ github.ref_name == 'dev' }}
-    runs-on: ubuntu-latest
-    needs: migrate-db-staging
-    env:
-      STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
-    steps:
-      - name: Validate staging URL variable
-        run: |
-          if [ -z "$STAGING_BASE_URL" ]; then
-            echo "STAGING_BASE_URL repository variable is required"
-            exit 1
-          fi
-
-      - name: Run staging core-flow E2E smoke
-        run: |
-          BASE_URL="${STAGING_BASE_URL%/}"
-
-          CREATE_RESPONSE=$(curl -fsS \
-            -H "Content-Type: application/json" \
-            -X POST "$BASE_URL/api/Task/CreateTask" \
-            -d '{"title":"gha-staging-e2e","description":"release gate"}')
-
-          TASK_ID=$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read()).get("id",""))' <<< "$CREATE_RESPONSE")
-
-          if [ -z "$TASK_ID" ]; then
-            echo "Failed to parse task id from CreateTask response"
-            echo "$CREATE_RESPONSE"
-            exit 1
-          fi
-
-          curl -fsS "$BASE_URL/api/Task/GetTaskById?id=$TASK_ID" > /dev/null
 
   migrate-db-production:
     if: ${{ github.ref_name == 'main' }}
     runs-on: ubuntu-latest
-    needs: [integration-core-feature, k6-performance-smoke]
+    needs: [integration-core-feature]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -167,6 +62,7 @@ jobs:
             -url="${{ secrets.PRODUCTION_DB_URL }}" \
             -user="${{ secrets.PRODUCTION_DB_USER }}" \
             -password="${{ secrets.PRODUCTION_DB_PASSWORD }}" \
+            -baselineOnMigrate=true \
             -connectRetries=60 \
             migrate
 

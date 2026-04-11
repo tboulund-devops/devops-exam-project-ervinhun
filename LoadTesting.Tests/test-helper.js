@@ -37,6 +37,7 @@ export function callEndpoint(endpoint, existingTaskIds) {
     }
 
     let res;
+    let data;
     if (endpoint.method === 'GET') {
         res = http.get(url, params);
     } else if (endpoint.method === 'POST' && Math.random() < 0.05) {
@@ -47,11 +48,17 @@ export function callEndpoint(endpoint, existingTaskIds) {
         });
         res = http.post(url, payload, params);
         // Delete after creation if backend allows
-        http.del(`${BASE_URL}/api/Task/DeleteTask?id=${res.json().id}`, params);
+        if (res && (res.status === 200 || res.status === 201)) {
+            try { data = res.json(); } catch(e) { data = null; }
+            if (data && data.id) {
+                http.del(`${BASE_URL}/api/Task/DeleteTask?id=${data.id}`, params);
+            }
+        }
     } else return null;
 
-    let data;
-    try { data = res.json(); } catch(e) { data = null; }
+    if (typeof data === 'undefined') {
+        try { data = res.json(); } catch(e) { data = null; }
+    }
 
     check(res, {
         'status is 200 or 201': r => r.status === 200 || r.status === 201,
