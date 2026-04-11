@@ -1,0 +1,108 @@
+﻿name: SonarQube Analysis
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - '**'
+
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-analyze:
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SECRET }}
+      PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY || secrets.SONAR_PROJECT_KEY }}
+      SONAR_URL: ${{ vars.SONAR_URL || secrets.SONAR_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # ---------------- SONAR PRECHECK ----------------
+      - name: Check Sonar configuration
+        run: |
+          if [ -z "$SONAR_TOKEN" ] || [ -z "$PROJECT_KEY" ] || [ -z "$SONAR_URL" ]; then
+            echo "Sonar is disabled for this run (missing SONAR_TOKEN, SONAR_PROJECT_KEY, or SONAR_URL)."
+            echo "SONAR_ENABLED=false" >> "$GITHUB_ENV"
+          else
+            echo "SONAR_ENABLED=true" >> "$GITHUB_ENV"
+          fi
+          
+      - name: Cache SonarQube scanner
+        id: cache-sonar-scanner
+        uses: actions/cache@v4
+        with:
+            path: ./.sonar/scanner
+            key: ${{ runner.os }}-sonar-scanner
+            restore-keys: ${{ runner.os }}-sonar-scanner
+
+      - name: Install SonarQube scanner
+        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ./.sonar/scanner
+          dotnet tool update dotnet-sonarscanner --tool-path ./.sonar/scanner || dotnet tool install dotnet-sonarscanner --tool-path ./.sonar/scanner
+          
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Install reportgenerator
+        run: |
+          mkdir -p ./.tools
+          dotnet tool update dotnet-reportgenerator-globaltool --tool-path ./.tools || dotnet tool install dotnet-reportgenerator-globaltool --tool-path ./.tools
+
+      # ---------------- SONAR BEGIN ----------------
+      - name: Start SonarQube Analysis
+        if: env.SONAR_ENABLED == 'true'
+        run: |
+          ./.sonar/scanner/dotnet-sonarscanner begin \
+            /k:"$PROJECT_KEY" \
+            /d:sonar.host.url="$SONAR_URL" \
+            /d:sonar.token="$SONAR_TOKEN" \
+            /d:sonar.scanner.scanAll=false \
+            /d:sonar.coverageReportPaths="coverage-report/SonarQube.xml"
+
+      # ---------------- BUILD & TEST ----------------
+      # These must run regardless, but coverage is only useful if Sonar started
+      - name: Restore
+        run: dotnet restore test/test.csproj
+
+      - name: Build
+        run: dotnet build test/test.csproj --no-restore -c Release
+
+      - name: Test with coverage
+        run: dotnet test test/test.csproj --no-build -c Release --collect:"XPlat Code Coverage"
+
+      - name: Generate SonarQube coverage report
+        if: env.SONAR_ENABLED == 'true'
+        run: |
+          mkdir -p coverage-report
+          ./.tools/reportgenerator \
+            "-reports:**/coverage.cobertura.xml" \
+            "-targetdir:coverage-report" \
+            "-reporttypes:SonarQube"
+
+      # ---------------- SONAR END ----------------
+      - name: Complete SonarQube Analysis
+        if: env.SONAR_ENABLED == 'true'
+        # Use continue-on-error if you don't want a Sonar failure to break the whole CI pipeline
+        continue-on-error: false
+        run: |
+          ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"

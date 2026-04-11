@@ -1,0 +1,69 @@
+name: Release Gates
+
+on:
+  push:
+    branches: ["dev", "main"]
+  workflow_dispatch:
+
+jobs:
+  migrate-db-staging:
+    if: ${{ github.ref_name == 'dev' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Apply Flyway migrations to staging
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/server/flyway/migrations:/flyway/sql" \
+            redgate/flyway:11.12.0 \
+            -url="${{ secrets.STAGING_DB_URL }}" \
+            -user="${{ secrets.STAGING_DB_USER }}" \
+            -password="${{ secrets.STAGING_DB_PASSWORD }}" \
+            -baselineOnMigrate=true -baselineVersion=0 \
+            -connectRetries=60 \
+            migrate
+
+  integration-core-feature:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore ./test/test.csproj
+
+      - name: Build
+        run: dotnet build ./test/test.csproj --no-restore --configuration Release
+
+      - name: Run one E2E core feature test
+        run: dotnet test ./test/test.csproj --no-build --configuration Release --filter "FullyQualifiedName~TaskControllerTests.MoveTask_ValidData_WritesStatusHistory"
+
+  
+
+  migrate-db-production:
+    if: ${{ github.ref_name == 'main' }}
+    runs-on: ubuntu-latest
+    needs: [integration-core-feature]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Apply Flyway migrations to production
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/server/flyway/migrations:/flyway/sql" \
+            redgate/flyway:11.12.0 \
+            -url="${{ secrets.PRODUCTION_DB_URL }}" \
+            -user="${{ secrets.PRODUCTION_DB_USER }}" \
+            -password="${{ secrets.PRODUCTION_DB_PASSWORD }}" \
+            -baselineOnMigrate=true -baselineVersion=0 \
+            -connectRetries=60 \
+            migrate
+

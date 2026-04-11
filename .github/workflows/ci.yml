@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "dev"]
+  pull_request:
+    branches: ["dev"]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install tools for coverage and stryker
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool --version 5.3.9
+          dotnet tool install -g dotnet-stryker --version 4.14.0
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Restore
+        run: dotnet restore ./server/server.csproj
+
+      - name: Build
+        run: dotnet build ./server/server.csproj --no-restore --configuration Release
+
+      - name: Run Stryker
+        working-directory: ./server
+        run: dotnet stryker --project server.csproj --test-project ../test/test.csproj --output ../StrykerOutput
+          
+        
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: StrykerOutput
+
+      - name: Run Tests with Code Coverage
+        run: dotnet test ./test/test.csproj --configuration Release --collect:"XPlat Code Coverage" --results-directory TestResults --logger "trx;LogFileName=test-results.trx"
+
+      - name: Generate Coverage Report
+        run: reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:coverage-report -reporttypes:Html
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-xplat
+          path: coverage-report
