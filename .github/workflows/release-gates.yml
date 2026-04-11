@@ -81,7 +81,7 @@ jobs:
   migrate-db-production:
     if: ${{ github.ref_name == 'main' }}
     runs-on: ubuntu-latest
-    needs: [integration-core-feature, k6-performance-smoke]
+    needs: [integration-core-feature, staging-e2e-validation]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
