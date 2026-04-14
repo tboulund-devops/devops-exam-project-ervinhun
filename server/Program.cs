@@ -3,11 +3,13 @@ using Microsoft.EntityFrameworkCore;
 using server.DataAccess;
 using server.Utils;
 using server.Services;
+using server.FHHelper;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 builder.Services.AddScoped<ITaskService, TaskService>();
+builder.Services.AddSingleton<FeatureStateProvider>();
 
 // Add CORS
 builder.Services.AddCors(options =>

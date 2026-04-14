@@ -77,6 +77,22 @@ public class SaveTaskToHistory(MyDbContext ctx)
             };
             ctx.TaskDetailHistories.Add(entry);
         }
+
+        if (!DueDateEquals(oldTask.DueDate, updateRequest.DueDate))
+        {
+            var oldDueDate = NormalizeDueDate(oldTask.DueDate);
+            var newDueDate = NormalizeDueDate(updateRequest.DueDate);
+            var entry = new TaskDetailHistory
+            {
+                TaskId = oldTask.Id,
+                FieldName = "DueDate",
+                OldValue = oldDueDate?.ToString("o"),
+                NewValue = newDueDate?.ToString("o"),
+                ChangedBy = updatedBy,
+                ChangedAt = timeNowUtc
+            };
+            ctx.TaskDetailHistories.Add(entry);
+        }
         
         await ctx.SaveChangesAsync();
     }
@@ -122,5 +138,25 @@ public class SaveTaskToHistory(MyDbContext ctx)
         };
         ctx.TaskDetailHistories.Add(entry);
         await ctx.SaveChangesAsync();
+    }
+
+    private static bool DueDateEquals(DateTime? left, DateTime? right)
+    {
+        return NormalizeDueDate(left) == NormalizeDueDate(right);
+    }
+
+    private static DateTime? NormalizeDueDate(DateTime? value)
+    {
+        if (!value.HasValue)
+        {
+            return null;
+        }
+
+        var utcValue = value.Value.Kind == DateTimeKind.Utc
+            ? value.Value
+            : value.Value.ToUniversalTime();
+
+        var normalizedTicks = utcValue.Ticks - (utcValue.Ticks % 10);
+        return new DateTime(normalizedTicks, DateTimeKind.Utc);
     }
 }
