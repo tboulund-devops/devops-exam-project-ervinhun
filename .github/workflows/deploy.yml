@@ -2,7 +2,7 @@ name: Deploy to production
 
 on:
   workflow_run:
-    workflows: ["SonarQube Analysis"]
+    workflows: ["Release Gates"]
     types: [completed]
     branches:
       - main
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   delivery:
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.name == 'SonarQube Analysis' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -22,6 +22,9 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      # ---------------------------
+      # VERSIONING (shared for both images)
+      # ---------------------------
       - name: Application version
         id: semver-app
         uses: paulhatch/semantic-version@v5.4.0
@@ -32,6 +35,9 @@ jobs:
         run: |
           echo "Version: ${{ steps.semver-app.outputs.version }}"
 
+      # ---------------------------
+      # LOGIN TO GHCR
+      # ---------------------------
       - name: Log in to GHCR
         uses: docker/login-action@v2
         with:
@@ -39,15 +45,35 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      # ---------------------------
+      # BUILD BACKEND IMAGE
+      # ---------------------------
+      - name: Build and push API image
         run: |
           docker build \
-              -t ghcr.io/${{ github.repository }}:staging \
-              -t ghcr.io/${{ github.repository }}:${{ steps.semver-app.outputs.version }} \
-              -f Dockerfile \
-              .
-          docker push ghcr.io/${{ github.repository }} --all-tags
+            -t ghcr.io/${{ github.repository }}-api:staging \
+            -t ghcr.io/${{ github.repository }}-api:${{ steps.semver-app.outputs.version }} \
+            -f api/Dockerfile \
+            ./api
 
+          docker push ghcr.io/${{ github.repository }}-api --all-tags
+
+      # ---------------------------
+      # BUILD FRONTEND IMAGE
+      # ---------------------------
+      - name: Build and push CLIENT image
+        run: |
+          docker build \
+            -t ghcr.io/${{ github.repository }}-client:staging \
+            -t ghcr.io/${{ github.repository }}-client:${{ steps.semver-app.outputs.version }} \
+            -f client/Dockerfile \
+            ./client
+
+          docker push ghcr.io/${{ github.repository }}-client --all-tags
+
+      # ---------------------------
+      # CREATE GITHUB RELEASE
+      # ---------------------------
       - name: Create release notes
         uses: ncipollo/release-action@v1
         with:
@@ -56,12 +82,17 @@ jobs:
           generateReleaseNotes: true
           allowUpdates: true
           body: |
-            - Version: ${{ steps.semver-app.outputs.version }}
-            - Commit: ${{ github.event.workflow_run.head_sha }}
-            - This release includes the following container image:
-            https://ghcr.io/${{ github.repository }}:${{ steps.semver-app.outputs.version }}
+            Version: ${{ steps.semver-app.outputs.version }}
+            Commit: ${{ github.event.workflow_run.head_sha }}
 
-      - name: Deliver Docker Compose file to staging
+            Images:
+            - ghcr.io/${{ github.repository }}-api:${{ steps.semver-app.outputs.version }}
+            - ghcr.io/${{ github.repository }}-client:${{ steps.semver-app.outputs.version }}
+
+      # ---------------------------
+      # DEPLOY COMPOSE FILE
+      # ---------------------------
+      - name: Deliver Docker Compose file to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ vars.STAGING_SERVER_IP }}
@@ -70,7 +101,10 @@ jobs:
           source: compose.deploy.yml
           target: ~/dowa/
 
-      - name: Run Docker Compose on staging server
+      # ---------------------------
+      # REMOTE DEPLOY
+      # ---------------------------
+      - name: Run Docker Compose on server
         uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ vars.STAGING_SERVER_IP }}
@@ -78,5 +112,6 @@ jobs:
           key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
           script: |
             cd ~/dowa
+
             docker compose -f compose.deploy.yml pull
             docker compose -f compose.deploy.yml up -d
