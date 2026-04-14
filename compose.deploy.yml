@@ -1,26 +1,18 @@
-services:
-  api:
-    image: ${API_IMAGE_REPO}:${IMAGE_TAG:-staging}
-    container_name: todowithextras-api
-    restart: unless-stopped
-    ports:
-      - "5000:5000"
-    environment:
-      ASPNETCORE_URLS: http://+:5000
-      ASPNETCORE_ENVIRONMENT: Production
-      CONNECTION_STRING: ${CONNECTION_STRING}
+    services:
+      api:
+        image: ghcr.io/tboulund-devops/devops-exam-project-ervinhun-api:staging
+        container_name: todowithextras-api
+        ports:
+          - "5000:5000"
 
-  client:
-    image: ${CLIENT_IMAGE_REPO}:${IMAGE_TAG:-staging}
-    container_name: dowa-client
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    environment:
-      VITE_API_URL: http://api:5000
-    depends_on:
-      - api
+      client:
+        image: ghcr.io/tboulund-devops/devops-exam-project-ervinhun-client:staging
+        container_name: dowa-client
+        ports:
+          - "80:80"
+        depends_on:
+          - api
 
-networks:
-  default:
-    name: dowa-network
+    networks:
+      default:
+        name: dowa-network
