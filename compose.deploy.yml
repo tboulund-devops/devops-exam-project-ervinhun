@@ -1,12 +1,26 @@
 services:
   api:
-    image: ${IMAGE_REPO}:${IMAGE_TAG:-staging}
+    image: ${API_IMAGE_REPO}:${IMAGE_TAG:-staging}
     container_name: todowithextras-api
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "5000:5000"
     environment:
-      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_URLS: http://+:5000
       ASPNETCORE_ENVIRONMENT: Production
       CONNECTION_STRING: ${CONNECTION_STRING}
 
+  client:
+    image: ${CLIENT_IMAGE_REPO}:${IMAGE_TAG:-staging}
+    container_name: dowa-client
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      VITE_API_URL: http://api:5000
+    depends_on:
+      - api
+
+networks:
+  default:
+    name: dowa-network
