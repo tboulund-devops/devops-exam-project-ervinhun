@@ -9,7 +9,7 @@ namespace server.Controller;
 
 [ApiController]
 [Route("api/[controller]")]
-public class TaskController(MyDbContext ctx, ITaskService taskService ) : ControllerBase
+public class TaskController(MyDbContext ctx, ITaskService taskService, ITaskCommentService taskCommentService ) : ControllerBase
 {
     private const string InvalidTaskIdMessage = "Invalid task id.";
 
@@ -71,6 +71,42 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
         }
 
         return task;
+    }
+    
+    //Get Comments
+    [HttpGet("{id:guid}/comments")]
+    public async Task<ActionResult<List<TaskCommentDto>>> GetCommentsByTaskId(Guid id)
+    {
+        try
+        {
+            var comments = await taskCommentService.GetCommentsByTaskIdAsync(id);
+            return Ok(comments);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+    
+    //Create comment for a task
+    [HttpPost("{id:guid}/comments")]
+    public async Task<ActionResult<TaskCommentDto>> CreateComment(
+        Guid id,
+        [FromBody] CreateTaskCommentRequest request)
+    {
+        try
+        {
+            var comment = await taskCommentService.CreateCommentAsync(id, request);
+            return Ok(comment);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 
     [HttpPost(nameof(MoveTask))]
