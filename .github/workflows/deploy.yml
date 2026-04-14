@@ -23,7 +23,7 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
 
       # ---------------------------
-      # VERSIONING (shared for both images)
+      # VERSIONING
       # ---------------------------
       - name: Application version
         id: semver-app
@@ -46,17 +46,17 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # ---------------------------
-      # BUILD BACKEND IMAGE
+      # BUILD SERVER IMAGE (CHANGED)
       # ---------------------------
-      - name: Build and push API image
+      - name: Build and push SERVER image
         run: |
           docker build \
-            -t ghcr.io/${{ github.repository }}-api:staging \
-            -t ghcr.io/${{ github.repository }}-api:${{ steps.semver-app.outputs.version }} \
-            -f api/Dockerfile \
-            ./api
+            -t ghcr.io/${{ github.repository }}-server:staging \
+            -t ghcr.io/${{ github.repository }}-server:${{ steps.semver-app.outputs.version }} \
+            -f server/Dockerfile \
+            ./server
 
-          docker push ghcr.io/${{ github.repository }}-api --all-tags
+          docker push ghcr.io/${{ github.repository }}-server --all-tags
 
       # ---------------------------
       # BUILD FRONTEND IMAGE
@@ -86,7 +86,7 @@ jobs:
             Commit: ${{ github.event.workflow_run.head_sha }}
 
             Images:
-            - ghcr.io/${{ github.repository }}-api:${{ steps.semver-app.outputs.version }}
+            - ghcr.io/${{ github.repository }}-server:${{ steps.semver-app.outputs.version }}
             - ghcr.io/${{ github.repository }}-client:${{ steps.semver-app.outputs.version }}
 
       # ---------------------------
