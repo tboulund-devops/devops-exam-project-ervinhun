@@ -36,40 +36,48 @@ jobs:
           echo "Version: ${{ steps.semver-app.outputs.version }}"
 
       # ---------------------------
-      # LOGIN TO GHCR
+      # LOGIN TO GHCR (IMPORTANT FIX)
       # ---------------------------
       - name: Log in to GHCR
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
       # ---------------------------
-      # BUILD SERVER IMAGE (CHANGED)
+      # DEFINE CLEAN IMAGE NAMES (FIX FOR FORK ISSUE)
+      # ---------------------------
+      - name: Set image names
+        run: |
+          echo "SERVER_IMAGE=ghcr.io/${{ secrets.GHCR_USERNAME }}/devops-project-server" >> $GITHUB_ENV
+          echo "CLIENT_IMAGE=ghcr.io/${{ secrets.GHCR_USERNAME }}/devops-project-client" >> $GITHUB_ENV
+
+      # ---------------------------
+      # BUILD SERVER IMAGE
       # ---------------------------
       - name: Build and push SERVER image
         run: |
           docker build \
-            -t ghcr.io/${{ github.repository }}-server:staging \
-            -t ghcr.io/${{ github.repository }}-server:${{ steps.semver-app.outputs.version }} \
+            -t $SERVER_IMAGE:staging \
+            -t $SERVER_IMAGE:${{ steps.semver-app.outputs.version }} \
             -f Dockerfile \
-            ./
+            .
 
-          docker push ghcr.io/${{ github.repository }}-server --all-tags
+          docker push $SERVER_IMAGE --all-tags
 
       # ---------------------------
-      # BUILD FRONTEND IMAGE
+      # BUILD CLIENT IMAGE
       # ---------------------------
       - name: Build and push CLIENT image
         run: |
           docker build \
-            -t ghcr.io/${{ github.repository }}-client:staging \
-            -t ghcr.io/${{ github.repository }}-client:${{ steps.semver-app.outputs.version }} \
+            -t $CLIENT_IMAGE:staging \
+            -t $CLIENT_IMAGE:${{ steps.semver-app.outputs.version }} \
             -f client/Dockerfile \
             ./client
 
-          docker push ghcr.io/${{ github.repository }}-client --all-tags
+          docker push $CLIENT_IMAGE --all-tags
 
       # ---------------------------
       # CREATE GITHUB RELEASE
@@ -86,8 +94,8 @@ jobs:
             Commit: ${{ github.event.workflow_run.head_sha }}
 
             Images:
-            - ghcr.io/${{ github.repository }}-server:${{ steps.semver-app.outputs.version }}
-            - ghcr.io/${{ github.repository }}-client:${{ steps.semver-app.outputs.version }}
+            - ${{ env.SERVER_IMAGE }}:${{ steps.semver-app.outputs.version }}
+            - ${{ env.CLIENT_IMAGE }}:${{ steps.semver-app.outputs.version }}
 
       # ---------------------------
       # DEPLOY COMPOSE FILE
@@ -111,6 +119,8 @@ jobs:
           username: ${{ vars.STAGING_SERVER_USERNAME }}
           key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
           script: |
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USERNAME }} --password-stdin
+
             cd ~/dowa
 
             docker compose -f compose.deploy.yml pull

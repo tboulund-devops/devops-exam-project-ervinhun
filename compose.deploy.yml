@@ -1,12 +1,12 @@
     services:
       api:
-        image: ghcr.io/tboulund-devops/devops-exam-project-ervinhun-api:staging
+        image: ghcr.io/ervinhun/devops-exam-project-ervinhun-api:staging
         container_name: todowithextras-api
         ports:
           - "5000:5000"
 
       client:
-        image: ghcr.io/tboulund-devops/devops-exam-project-ervinhun-client:staging
+        image: ghcr.io/ervinhun/devops-exam-project-ervinhun-client:staging
         container_name: dowa-client
         ports:
           - "80:80"
