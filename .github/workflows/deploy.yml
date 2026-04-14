@@ -54,6 +54,7 @@ jobs:
           tag: ${{ steps.semver-app.outputs.version }}
           name: Release ${{ steps.semver-app.outputs.version }}
           generateReleaseNotes: true
+          allowUpdates: true
           body: |
             - Version: ${{ steps.semver-app.outputs.version }}
             - Commit: ${{ github.event.workflow_run.head_sha }}
