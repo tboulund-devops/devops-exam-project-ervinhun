@@ -53,8 +53,8 @@ jobs:
           docker build \
             -t ghcr.io/${{ github.repository }}-server:staging \
             -t ghcr.io/${{ github.repository }}-server:${{ steps.semver-app.outputs.version }} \
-            -f server/Dockerfile \
-            ./server
+            -f Dockerfile \
+            ./
 
           docker push ghcr.io/${{ github.repository }}-server --all-tags
 
