@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using server.DataAccess;
 using server.Dto;
+using server.FHHelper;
 using server.Services;
 using server.Utils;
 
@@ -9,9 +10,11 @@ namespace server.Controller;
 
 [ApiController]
 [Route("api/[controller]")]
-public class TaskController(MyDbContext ctx, ITaskService taskService, ITaskCommentService taskCommentService ) : ControllerBase
+public class TaskController(MyDbContext ctx, ITaskService taskService, ITaskCommentService taskCommentService, FeatureStateProvider featureStateProvider ) : ControllerBase
 {
     private const string InvalidTaskIdMessage = "Invalid task id.";
+    private readonly ITaskCommentService _taskCommentService = taskCommentService;
+    private readonly FeatureStateProvider _featureStateProvider = featureStateProvider;
 
     [HttpGet("Users")]
     public async Task<IActionResult> GetUsers()
@@ -73,13 +76,18 @@ public class TaskController(MyDbContext ctx, ITaskService taskService, ITaskComm
         return task;
     }
     
-    //Get Comments
+    // Get comments for a task
     [HttpGet("{id:guid}/comments")]
     public async Task<ActionResult<List<TaskCommentDto>>> GetCommentsByTaskId(Guid id)
     {
+        if (!_featureStateProvider.IsEnabled("GetCommentsByTaskId"))
+        {
+            throw new NotImplementedException("The 'GetCommentsByTaskId' feature is not enabled.");
+        }
+
         try
         {
-            var comments = await taskCommentService.GetCommentsByTaskIdAsync(id);
+            var comments = await _taskCommentService.GetCommentsByTaskIdAsync(id);
             return Ok(comments);
         }
         catch (KeyNotFoundException ex)
@@ -87,16 +95,21 @@ public class TaskController(MyDbContext ctx, ITaskService taskService, ITaskComm
             return NotFound(ex.Message);
         }
     }
-    
-    //Create comment for a task
+
+    // Create comment for a task
     [HttpPost("{id:guid}/comments")]
     public async Task<ActionResult<TaskCommentDto>> CreateComment(
         Guid id,
         [FromBody] CreateTaskCommentRequest request)
     {
+        if (!_featureStateProvider.IsEnabled("CreateComment"))
+        {
+            throw new NotImplementedException("The 'CreateComment' feature is not enabled.");
+        }
+
         try
         {
-            var comment = await taskCommentService.CreateCommentAsync(id, request);
+            var comment = await _taskCommentService.CreateCommentAsync(id, request);
             return Ok(comment);
         }
         catch (ArgumentException ex)
