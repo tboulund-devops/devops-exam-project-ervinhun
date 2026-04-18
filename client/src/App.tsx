@@ -25,7 +25,7 @@ function App() {
 
   const [showModal,    setShowModal]    = useState(false);
   const [editingTask,  setEditingTask]  = useState<TaskDto | null>(null);
-  const [form,         setForm]         = useState<CreateTaskRequest>({ title: '', description: '', assigneeId: undefined });
+  const [form,         setForm]         = useState<CreateTaskRequest>({ title: '', description: '', assigneeId: undefined, dueDate: undefined });
   const [submitting,   setSubmitting]   = useState(false);
 
   const [movingTask,   setMovingTask]   = useState<TaskDto | null>(null);
@@ -60,14 +60,14 @@ function App() {
   const openCreate = () => {
     if (!features?.createTask) return;
     setEditingTask(null);
-    setForm({ title: '', description: '', assigneeId: undefined });
+    setForm({ title: '', description: '', assigneeId: undefined, dueDate: undefined });
     setShowModal(true);
   };
 
   const openEdit = (task: TaskDto) => {
     if (!features?.updateTask) return;
     setEditingTask(task);
-    setForm({ title: task.title, description: task.description ?? '', assigneeId: task.assignee?.id });
+    setForm({ title: task.title, description: task.description ?? '', assigneeId: task.assignee?.id, dueDate: task.dueDate });
     setShowModal(true);
   };
 
@@ -89,13 +89,15 @@ function App() {
         await updateTask(editingTask.id, {
           title: form.title,
           description: form.description,
-          assigneeId: form.assigneeId
+          assigneeId: form.assigneeId,
+          dueDate: form.dueDate
         });
       } else {
         await createTask({
           title: form.title,
           description: form.description,
-          assigneeId: form.assigneeId
+          assigneeId: form.assigneeId,
+          dueDate: form.dueDate
         });
       }
       setShowModal(false);
@@ -285,6 +287,9 @@ function App() {
                                         <span className="unassigned">Unassigned</span>
                                     )}
                                     <span className="card-date">{formatDate(task.createdAt)}</span>
+                                    {features?.taskExpiry && task.dueDate && (
+                                        <span className="card-date">Due: {formatDate(task.dueDate)}</span>
+                                    )}
                                   </div>
                                 </div>
                             ))
@@ -330,6 +335,17 @@ function App() {
                     <option value="">Unassigned</option>
                     {users.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
                   </select>
+                  {features?.taskExpiry && (
+                      <>
+                        <label className="field-label">Due Date</label>
+                        <input
+                            type="date"
+                            className="field-input"
+                            value={form.dueDate ?? ''}
+                            onChange={e => setForm(f => ({ ...f, dueDate: e.target.value || undefined }))}
+                        />
+                      </>
+                  )}
                 </div>
                 <div className="modal-footer">
                   <button className="btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>

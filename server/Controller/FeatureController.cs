@@ -19,7 +19,8 @@ public class FeatureController(FeatureStateProvider featureStateProvider): Contr
             updateTask = featureStateProvider.IsEnabled("UpdateTask"),
             deleteTask = featureStateProvider.IsEnabled("DeleteTask"),
             moveTask = featureStateProvider.IsEnabled("MoveTask"),
-            getTasks = featureStateProvider.IsEnabled("GetTasks")
+            getTasks = featureStateProvider.IsEnabled("GetTasks"),
+            taskExpiry = featureStateProvider.IsEnabled("TaskExpiry")
         });
     }
 }
