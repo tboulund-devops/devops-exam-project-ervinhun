@@ -1,11 +1,10 @@
-name: Deploy to production
+name: Deploy to staging
 
 on:
   workflow_run:
     workflows: ["Release Gates"]
     types: [completed]
-    branches:
-      - main
+    branches: [dev]
 
 permissions:
   contents: write
@@ -21,25 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 0
-          fetch-tags: true
-
-      # ---------------------------
-      # VERSIONING
-      # ---------------------------
-      - name: Application version
-        id: semver-app
-        uses: paulhatch/semantic-version@v5.4.0
-        with:
-          tag_prefix: ""
-          major_pattern: "\\(MAJOR\\)"
-          minor_pattern: "\\(MINOR\\)"
-          bump_each_commit: true
-
-      - name: Echo version
-        run: |
-          echo "Version: ${{ steps.semver-app.outputs.version }}"
-
+      
       # ---------------------------
       # LOGIN TO GHCR (IMPORTANT FIX)
       # ---------------------------
@@ -67,12 +48,11 @@ jobs:
       - name: Build and push SERVER image
         run: |
           docker build \
-            -t $SERVER_IMAGE:staging \
-            -t $SERVER_IMAGE:${{ steps.semver-app.outputs.version }} \
+            -t $SERVER_IMAGE:latest-staging \
             -f Dockerfile \
             .
 
-          docker push $SERVER_IMAGE --all-tags
+          docker push $SERVER_IMAGE:latest-staging
 
       # ---------------------------
       # BUILD CLIENT IMAGE
@@ -80,30 +60,11 @@ jobs:
       - name: Build and push CLIENT image
         run: |
           docker build \
-            -t $CLIENT_IMAGE:staging \
-            -t $CLIENT_IMAGE:${{ steps.semver-app.outputs.version }} \
+            -t $CLIENT_IMAGE:latest-staging \
             -f client/Dockerfile \
             ./client
 
-          docker push $CLIENT_IMAGE --all-tags
-
-      # ---------------------------
-      # CREATE GITHUB RELEASE
-      # ---------------------------
-      - name: Create release notes
-        uses: ncipollo/release-action@v1
-        with:
-          tag: ${{ steps.semver-app.outputs.version }}
-          name: Release ${{ steps.semver-app.outputs.version }}
-          generateReleaseNotes: true
-          allowUpdates: true
-          body: |
-            Version: ${{ steps.semver-app.outputs.version }}
-            Commit: ${{ github.event.workflow_run.head_sha }}
-
-            Images:
-            - ${{ env.SERVER_IMAGE }}:${{ steps.semver-app.outputs.version }}
-            - ${{ env.CLIENT_IMAGE }}:${{ steps.semver-app.outputs.version }}
+          docker push $CLIENT_IMAGE:latest-staging
 
       # ---------------------------
       # DEPLOY COMPOSE FILE
@@ -111,11 +72,12 @@ jobs:
       - name: Deliver Docker Compose file to server
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ vars.PROD_SERVER_IP }}
-          username: ${{ vars.PROD_SERVER_USERNAME }}
-          key: ${{ secrets.PROD_SERVER_SSH_KEY }}
-          source: compose.deploy.yml
-          target: ~/dowa/
+          host: ${{ vars.STAGING_SERVER_IP }}
+          username: ${{ vars.STAGING_SERVER_USERNAME }}
+          key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
+          source: compose.staging.yml
+          target: /home/${{ vars.STAGING_SERVER_USERNAME }}/dowa/
+          overwrite: true
 
       # ---------------------------
       # REMOTE DEPLOY
@@ -123,15 +85,17 @@ jobs:
       - name: Run Docker Compose on server
         uses: appleboy/ssh-action@v1.2.5
         with:
-          host: ${{ vars.PROD_SERVER_IP }}
-          username: ${{ vars.PROD_SERVER_USERNAME }}
-          key: ${{ secrets.PROD_SERVER_SSH_KEY }}
+          host: ${{ vars.STAGING_SERVER_IP }}
+          username: ${{ vars.STAGING_SERVER_USERNAME }}
+          key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
           script: |
+            set -e
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            cd ~/dowa
+            cd /home/${{ vars.STAGING_SERVER_USERNAME }}/dowa
 
-            export VERSION="${{ steps.semver-app.outputs.version }}"
+            test -f compose.staging.yml
+            ls -la compose.staging.yml
 
-            docker compose -f compose.deploy.yml pull
-            docker compose -f compose.deploy.yml up -d
+            docker compose --env-file .env -f compose.staging.yml pull
+            docker compose --env-file .env -f compose.staging.yml up -d
