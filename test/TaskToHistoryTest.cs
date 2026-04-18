@@ -161,6 +161,75 @@ public class TaskToHistoryTest(CustomWebApplicationFactory factory, ITestOutputH
     }
 
     [Fact]
+    [DisplayName("OnUpdate with due date changed creates due date history entry")]
+    public async Task OnUpdate_DueDateChanged_CreatesDueDateHistoryEntry()
+    {
+        var (task, systemUserId) = await CreateTaskWithSystemUser();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
+        var sut = new SaveTaskToHistory(db);
+
+        var oldDueDate = DateTime.UtcNow.AddDays(1);
+        task.DueDate = oldDueDate;
+        await db.SaveChangesAsync();
+
+        var newDueDate = oldDueDate.AddDays(2);
+        var request = new UpdateTaskRequest
+        {
+            Title = task.Title,
+            Description = task.Description,
+            AssigneeId = task.AssigneeId,
+            DueDate = newDueDate
+        };
+
+        await sut.OnUpdate(task, request, systemUserId);
+
+        var dueDateEntries = await db.TaskDetailHistories
+            .AsNoTracking()
+            .Where(h => h.TaskId == task.Id && h.FieldName == "DueDate")
+            .ToListAsync();
+
+        dueDateEntries.Should().HaveCount(1);
+        DateTimeOffset.TryParse(dueDateEntries[0].OldValue, out var parsedOld).Should().BeTrue();
+        DateTimeOffset.TryParse(dueDateEntries[0].NewValue, out var parsedNew).Should().BeTrue();
+        parsedOld.UtcDateTime.Should().BeCloseTo(oldDueDate, TimeSpan.FromSeconds(1));
+        parsedNew.UtcDateTime.Should().BeCloseTo(newDueDate, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    [DisplayName("OnUpdate with unchanged due date does not create due date history entry")]
+    public async Task OnUpdate_DueDateUnchanged_DoesNotCreateDueDateHistoryEntry()
+    {
+        var (task, systemUserId) = await CreateTaskWithSystemUser();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
+        var sut = new SaveTaskToHistory(db);
+
+        var sameDueDate = DateTime.UtcNow.AddDays(3);
+        task.DueDate = sameDueDate;
+        await db.SaveChangesAsync();
+
+        var request = new UpdateTaskRequest
+        {
+            Title = task.Title,
+            Description = task.Description,
+            AssigneeId = task.AssigneeId,
+            DueDate = sameDueDate
+        };
+
+        await sut.OnUpdate(task, request, systemUserId);
+
+        var dueDateEntries = await db.TaskDetailHistories
+            .AsNoTracking()
+            .Where(h => h.TaskId == task.Id && h.FieldName == "DueDate")
+            .ToListAsync();
+
+        dueDateEntries.Should().BeEmpty();
+    }
+
+    [Fact]
     [DisplayName("OnStatusChange with unknown user throws KeyNotFoundException")]
     public async Task OnStatusChange_WithUnknownUser_Throws()
     {
