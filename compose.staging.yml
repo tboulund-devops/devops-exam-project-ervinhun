@@ -1,0 +1,22 @@
+services:
+  api:
+    image: ghcr.io/ervinhun/todowithextras-api:latest-staging
+    env_file:
+      - .env
+    container_name: todowithextras-api
+    ports:
+      - "5000:8080"
+  
+  client:
+    image: ghcr.io/ervinhun/todowithextras-client:latest-staging
+    env_file:
+      - .env
+    container_name: dowa-client
+    ports:
+      - "3000:5173"
+    depends_on:
+      - api
+
+networks:
+  default:
+    name: dowa-network
