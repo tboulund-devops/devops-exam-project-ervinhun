@@ -10,9 +10,10 @@ namespace server.Controller;
 
 [ApiController]
 [Route("api/[controller]")]
-public class TaskController(MyDbContext ctx, ITaskService taskService, FeatureStateProvider featureStateProvider) : ControllerBase
+public class TaskController(MyDbContext ctx, ITaskService taskService, ITaskCommentService taskCommentService, FeatureStateProvider featureStateProvider ) : ControllerBase
 {
     private const string InvalidTaskIdMessage = "Invalid task id.";
+    private readonly ITaskCommentService _taskCommentService = taskCommentService;
     private readonly FeatureStateProvider _featureStateProvider = featureStateProvider;
 
     [HttpGet("Users")]
@@ -85,6 +86,52 @@ public class TaskController(MyDbContext ctx, ITaskService taskService, FeatureSt
         }
 
         return task;
+    }
+    
+    // Get comments for a task
+    [HttpGet("{id:guid}/comments")]
+    public async Task<ActionResult<List<TaskCommentDto>>> GetCommentsByTaskId(Guid id)
+    {
+        if (!_featureStateProvider.IsEnabled("GetCommentsByTaskId"))
+        {
+            throw new NotImplementedException("The 'GetCommentsByTaskId' feature is not enabled.");
+        }
+
+        try
+        {
+            var comments = await _taskCommentService.GetCommentsByTaskIdAsync(id);
+            return Ok(comments);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    // Create comment for a task
+    [HttpPost("{id:guid}/comments")]
+    public async Task<ActionResult<TaskCommentDto>> CreateComment(
+        Guid id,
+        [FromBody] CreateTaskCommentRequest request)
+    {
+        if (!_featureStateProvider.IsEnabled("CreateComment"))
+        {
+            throw new NotImplementedException("The 'CreateComment' feature is not enabled.");
+        }
+
+        try
+        {
+            var comment = await _taskCommentService.CreateCommentAsync(id, request);
+            return Ok(comment);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 
     [HttpPost(nameof(MoveTask))]
