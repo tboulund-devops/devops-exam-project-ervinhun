@@ -64,6 +64,7 @@ public class TaskService(MyDbContext ctx) : ITaskService
                 Title = t.Title,
                 Description = t.Description,
                 CreatedAt = t.CreatedAt,
+                DueDate = t.DueDate,
                 Status = t.Status.Name,
                 Assignee = t.Assignee == null
                     ? null

@@ -110,6 +110,44 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
     }
 
     [Fact]
+    [DisplayName("CreateTask with DueDate returns and persists DueDate")]
+    public async Task CreateTask_WithDueDate_ReturnsAndPersistsDueDate()
+    {
+        var dueDate = DateTime.UtcNow.AddDays(5);
+        var createRequest = new CreateTaskRequest
+        {
+            Title = "Task with due date",
+            Description = "DueDate create test",
+            DueDate = dueDate
+        };
+
+        var createResponse = await _client.PostAsJsonAsync("/api/Task/CreateTask", createRequest);
+        var error = await createResponse.Content.ReadAsStringAsync();
+        createResponse.IsSuccessStatusCode.Should().BeTrue($"because create should succeed, but got: {error}");
+
+        var createdTask = await createResponse.Content.ReadFromJsonAsync<TaskDto>();
+        createdTask.Should().NotBeNull();
+        createdTask!.DueDate.Should().NotBeNull();
+        createdTask.DueDate!.Value.Should().BeCloseTo(dueDate, TimeSpan.FromSeconds(1));
+
+        var getByIdResponse = await _client.GetAsync($"/api/Task/GetTaskById?id={createdTask.Id}");
+        getByIdResponse.IsSuccessStatusCode.Should().BeTrue();
+        var fetchedById = await getByIdResponse.Content.ReadFromJsonAsync<TaskDto>();
+        fetchedById.Should().NotBeNull();
+        fetchedById!.DueDate.Should().NotBeNull();
+        fetchedById.DueDate!.Value.Should().BeCloseTo(dueDate, TimeSpan.FromSeconds(1));
+
+        var getTasksResponse = await _client.GetAsync("/api/Task/GetTasks");
+        getTasksResponse.IsSuccessStatusCode.Should().BeTrue();
+        var tasks = await getTasksResponse.Content.ReadFromJsonAsync<List<TaskDto>>();
+        tasks.Should().NotBeNull();
+
+        var listed = tasks!.Single(t => t.Id == createdTask.Id);
+        listed.DueDate.Should().NotBeNull();
+        listed.DueDate!.Value.Should().BeCloseTo(dueDate, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
     [DisplayName("CreateTask with missing title returns BadRequest")]
     public async Task CreateTask_MissingTitle()
     {
@@ -271,6 +309,116 @@ public class TaskControllerTests(CustomWebApplicationFactory factory, ITestOutpu
             h.OldValue == "Original Description" &&
             h.NewValue == "Updated Description" &&
             h.ChangedBy == systemUserId);
+    }
+
+    [Fact]
+    [DisplayName("UpdateTask when DueDate changes updates task and writes DueDate history")]
+    public async Task UpdateTask_DueDateChanged_WritesDueDateHistory()
+    {
+        var initialDueDate = DateTime.UtcNow.AddDays(1);
+        var createResponse = await _client.PostAsJsonAsync("/api/Task/CreateTask", new CreateTaskRequest
+        {
+            Title = "DueDate history task",
+            Description = "Initial",
+            DueDate = initialDueDate
+        });
+        createResponse.IsSuccessStatusCode.Should().BeTrue();
+        var createdTask = await createResponse.Content.ReadFromJsonAsync<TaskDto>();
+        createdTask.Should().NotBeNull();
+
+        var updatedDueDate = initialDueDate.AddDays(2);
+        var updateRequest = new UpdateTaskRequest
+        {
+            Title = "DueDate history task",
+            Description = "Initial",
+            AssigneeId = null,
+            DueDate = updatedDueDate
+        };
+
+        var updateResponse = await _client.PutAsJsonAsync($"/api/Task/UpdateTask?id={createdTask!.Id}", updateRequest);
+        var updateError = await updateResponse.Content.ReadAsStringAsync();
+        updateResponse.IsSuccessStatusCode.Should().BeTrue($"because update should succeed, but got: {updateError}");
+
+        var updatedTask = await updateResponse.Content.ReadFromJsonAsync<TaskDto>();
+        updatedTask.Should().NotBeNull();
+        updatedTask!.DueDate.Should().NotBeNull();
+        updatedTask.DueDate!.Value.Should().BeCloseTo(updatedDueDate, TimeSpan.FromSeconds(1));
+
+        var detailHistory = await GetTaskDetailHistory(createdTask.Id);
+        var dueDateEntries = detailHistory.Where(h => h.FieldName == "DueDate").ToList();
+        dueDateEntries.Should().HaveCount(1);
+        dueDateEntries[0].OldValue.Should().NotBeNullOrWhiteSpace();
+        dueDateEntries[0].NewValue.Should().NotBeNullOrWhiteSpace();
+        DateTimeOffset.TryParse(dueDateEntries[0].OldValue, out var parsedOld).Should().BeTrue();
+        DateTimeOffset.TryParse(dueDateEntries[0].NewValue, out var parsedNew).Should().BeTrue();
+        parsedOld.UtcDateTime.Should().BeCloseTo(initialDueDate, TimeSpan.FromSeconds(1));
+        parsedNew.UtcDateTime.Should().BeCloseTo(updatedDueDate, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    [DisplayName("UpdateTask with unchanged DueDate does not write DueDate history")]
+    public async Task UpdateTask_DueDateUnchanged_DoesNotWriteDueDateHistory()
+    {
+        var dueDate = DateTime.UtcNow.AddDays(3);
+        var createResponse = await _client.PostAsJsonAsync("/api/Task/CreateTask", new CreateTaskRequest
+        {
+            Title = "DueDate no-op task",
+            Description = "No-op",
+            DueDate = dueDate
+        });
+        createResponse.IsSuccessStatusCode.Should().BeTrue();
+        var createdTask = await createResponse.Content.ReadFromJsonAsync<TaskDto>();
+        createdTask.Should().NotBeNull();
+
+        var updateRequest = new UpdateTaskRequest
+        {
+            Title = "DueDate no-op task",
+            Description = "No-op",
+            AssigneeId = null,
+            DueDate = dueDate
+        };
+
+        var updateResponse = await _client.PutAsJsonAsync($"/api/Task/UpdateTask?id={createdTask!.Id}", updateRequest);
+        updateResponse.IsSuccessStatusCode.Should().BeTrue();
+
+        var detailHistory = await GetTaskDetailHistory(createdTask.Id);
+        detailHistory.Should().NotContain(h => h.FieldName == "DueDate");
+    }
+
+    [Fact]
+    [DisplayName("UpdateTask can clear DueDate and writes DueDate history with null new value")]
+    public async Task UpdateTask_ClearDueDate_WritesNullDueDateHistory()
+    {
+        var dueDate = DateTime.UtcNow.AddDays(4);
+        var createResponse = await _client.PostAsJsonAsync("/api/Task/CreateTask", new CreateTaskRequest
+        {
+            Title = "DueDate clear task",
+            Description = "Clear",
+            DueDate = dueDate
+        });
+        createResponse.IsSuccessStatusCode.Should().BeTrue();
+        var createdTask = await createResponse.Content.ReadFromJsonAsync<TaskDto>();
+        createdTask.Should().NotBeNull();
+
+        var clearRequest = new UpdateTaskRequest
+        {
+            Title = "DueDate clear task",
+            Description = "Clear",
+            AssigneeId = null,
+            DueDate = null
+        };
+
+        var clearResponse = await _client.PutAsJsonAsync($"/api/Task/UpdateTask?id={createdTask!.Id}", clearRequest);
+        clearResponse.IsSuccessStatusCode.Should().BeTrue();
+        var clearedTask = await clearResponse.Content.ReadFromJsonAsync<TaskDto>();
+        clearedTask.Should().NotBeNull();
+        clearedTask!.DueDate.Should().BeNull();
+
+        var detailHistory = await GetTaskDetailHistory(createdTask.Id);
+        var dueDateEntries = detailHistory.Where(h => h.FieldName == "DueDate").ToList();
+        dueDateEntries.Should().HaveCount(1);
+        dueDateEntries[0].OldValue.Should().NotBeNullOrWhiteSpace();
+        dueDateEntries[0].NewValue.Should().BeNull();
     }
 
     [Fact]
