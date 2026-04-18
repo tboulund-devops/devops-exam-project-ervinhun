@@ -1,5 +1,12 @@
 ﻿import { apiFetch } from './api';
-import type { TaskDto, UserDto, CreateTaskRequest, UpdateTaskRequest } from '../types';
+import type {
+    TaskDto,
+    UserDto,
+    CreateTaskRequest,
+    UpdateTaskRequest,
+    TaskCommentDto,
+    CreateTaskCommentRequest
+} from '../types';
 
 export interface StatusDto {
     id: string;
@@ -42,4 +49,11 @@ export const deleteTask = (id: string) =>
 export const archiveTask = (id: string) =>
     apiFetch<void>(`/Task/ArchiveTask?id=${id}`, {
         method: 'PATCH',
+export const getCommentsByTaskId = (taskId: string) =>
+    apiFetch<TaskCommentDto[]>(`/Task/${taskId}/comments`);
+
+export const createComment = (taskId: string, data: CreateTaskCommentRequest) =>
+    apiFetch<TaskCommentDto>(`/Task/${taskId}/comments`, {
+        method: 'POST',
+        body: JSON.stringify(data),
     });

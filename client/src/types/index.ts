@@ -29,3 +29,17 @@ export interface MoveTaskRequest {
     newStatusId: string;
     changedByUserId: string;
 }
+
+export interface TaskCommentDto {
+    id: string;
+    taskId: string;
+    content: string;
+    createdAt: string;
+    userId?: string;
+    username?: string;
+}
+
+export interface CreateTaskCommentRequest {
+    content: string;
+    userId?: string;
+}
