@@ -1,6 +1,6 @@
     services:
       api:
-        image: ghcr.io/ervinhun/todowithextras-api:${VERSION}
+        image: ghcr.io/tboulund-devops/devops-exam-project-ervinhun-api:${VERSION}
         env_file:
           - .env
         container_name: todowithextras-api
@@ -8,7 +8,7 @@
           - "5000:8080"
 
       client:
-        image: ghcr.io/ervinhun/todowithextras-client:${VERSION}
+        image: ghcr.io/tboulund-devops/devops-exam-project-ervinhun-client:${VERSION}
         env_file:
           - .env
         container_name: dowa-client
