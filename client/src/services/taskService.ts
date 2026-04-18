@@ -46,6 +46,9 @@ export const moveTask = (taskId: string, newStatusId: string, changedByUserId: s
 export const deleteTask = (id: string) =>
     apiFetch<void>(`/Task/DeleteTask?id=${id}`, { method: 'DELETE' });
 
+export const archiveTask = (id: string) =>
+    apiFetch<void>(`/Task/ArchiveTask?id=${id}`, {
+        method: 'PATCH',
 export const getCommentsByTaskId = (taskId: string) =>
     apiFetch<TaskCommentDto[]>(`/Task/${taskId}/comments`);
 
