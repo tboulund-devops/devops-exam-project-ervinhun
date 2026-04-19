@@ -134,12 +134,21 @@ jobs:
 
       - name: Smoke-check Task endpoint before k6
         run: |
-          set -e
-          STATUS_CODE=$(curl -sS -o smoke-response.json -w "%{http_code}" "$API_BASE_URL/api/Task/GetTasks")
-          if [ "$STATUS_CODE" -lt 200 ] || [ "$STATUS_CODE" -ge 300 ]; then
-            echo "Task endpoint smoke check failed with HTTP $STATUS_CODE"
+          CURL_EXIT=0
+          STATUS_CODE=$(curl -sS -o smoke-response.json -w "%{http_code}" "$API_BASE_URL/api/Task/GetTasks") || CURL_EXIT=$?
+
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            STATUS_CODE="000"
+          fi
+
+          if [ "$CURL_EXIT" -ne 0 ] || [ "$STATUS_CODE" -lt 200 ] || [ "$STATUS_CODE" -ge 300 ]; then
+            echo "Task endpoint smoke check failed (curl exit: $CURL_EXIT, http: $STATUS_CODE)"
             echo "--- response body (first 2000 chars) ---"
-            head -c 2000 smoke-response.json || true
+            if [ -f smoke-response.json ]; then
+              head -c 2000 smoke-response.json || true
+            else
+              echo "No response body captured."
+            fi
             echo
             echo "--- api.log (last 200 lines) ---"
             tail -n 200 api.log || true
