@@ -28,7 +28,8 @@ tools:
     toolsets: [default]
 
 timeout-minutes: 30
-strict: true
+model: claude-sonnet-4.5
+strict: false
 ---
 
 <!-- This prompt will be imported in the agentic workflow .github/workflows/code-simplifier.md at runtime. -->
