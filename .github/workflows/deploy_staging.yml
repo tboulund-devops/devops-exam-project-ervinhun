@@ -1,0 +1,101 @@
+name: Deploy to staging
+
+on:
+  workflow_run:
+    workflows: ["Release Gates"]
+    types: [completed]
+    branches: [dev]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  delivery:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      
+      # ---------------------------
+      # LOGIN TO GHCR (IMPORTANT FIX)
+      # ---------------------------
+      - name: Log in to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ---------------------------
+      # DEFINE CLEAN IMAGE NAMES (FIX FOR FORK ISSUE)
+      # ---------------------------
+      - name: Set image names
+        run: |
+          OWNER_LOWER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          REPO_LOWER="$(echo "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')"
+          IMAGE_PREFIX="ghcr.io/${OWNER_LOWER}/${REPO_LOWER}"
+          echo "SERVER_IMAGE=${IMAGE_PREFIX}-api" >> $GITHUB_ENV
+          echo "CLIENT_IMAGE=${IMAGE_PREFIX}-client" >> $GITHUB_ENV
+
+      # ---------------------------
+      # BUILD SERVER IMAGE
+      # ---------------------------
+      - name: Build and push SERVER image
+        run: |
+          docker build \
+            -t $SERVER_IMAGE:latest-staging \
+            -f Dockerfile \
+            .
+
+          docker push $SERVER_IMAGE:latest-staging
+
+      # ---------------------------
+      # BUILD CLIENT IMAGE
+      # ---------------------------
+      - name: Build and push CLIENT image
+        run: |
+          docker build \
+            -t $CLIENT_IMAGE:latest-staging \
+            -f client/Dockerfile \
+            ./client
+
+          docker push $CLIENT_IMAGE:latest-staging
+
+      # ---------------------------
+      # DEPLOY COMPOSE FILE
+      # ---------------------------
+      - name: Deliver Docker Compose file to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ vars.STAGING_SERVER_IP }}
+          username: ${{ vars.STAGING_SERVER_USERNAME }}
+          key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
+          source: compose.staging.yml
+          target: /home/${{ vars.STAGING_SERVER_USERNAME }}/dowa/
+          overwrite: true
+
+      # ---------------------------
+      # REMOTE DEPLOY
+      # ---------------------------
+      - name: Run Docker Compose on server
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ vars.STAGING_SERVER_IP }}
+          username: ${{ vars.STAGING_SERVER_USERNAME }}
+          key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
+          script: |
+            set -e
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+            cd /home/${{ vars.STAGING_SERVER_USERNAME }}/dowa
+
+            test -f compose.staging.yml
+            ls -la compose.staging.yml
+
+            docker compose --env-file .env -f compose.staging.yml pull
+            docker compose --env-file .env -f compose.staging.yml up -d

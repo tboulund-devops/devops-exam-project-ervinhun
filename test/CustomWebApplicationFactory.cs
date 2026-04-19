@@ -33,6 +33,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<server.Program>
     {
         builder.UseEnvironment("Test");
 
+        Environment.SetEnvironmentVariable("FEATURE_HUB_BYPASS", "true");
+        Environment.SetEnvironmentVariable("FEATURE_HUB_URL", "http://localhost");
+        Environment.SetEnvironmentVariable("FEATURE_HUB_API_KEY", "test-api-key");
+
         builder.ConfigureServices(services =>
         {
             // Remove all existing DbContext related registrations

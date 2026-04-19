@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   delivery:
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -21,6 +21,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          fetch-tags: true
 
       # ---------------------------
       # VERSIONING
@@ -29,6 +31,9 @@ jobs:
         id: semver-app
         uses: paulhatch/semantic-version@v5.4.0
         with:
+          tag_prefix: ""
+          major_pattern: "\\(MAJOR\\)"
+          minor_pattern: "\\(MINOR\\)"
           bump_each_commit: true
 
       - name: Echo version
@@ -50,8 +55,11 @@ jobs:
       # ---------------------------
       - name: Set image names
         run: |
-          echo "SERVER_IMAGE=ghcr.io/${{ secrets.GHCR_USERNAME }}/devops-project-server" >> $GITHUB_ENV
-          echo "CLIENT_IMAGE=ghcr.io/${{ secrets.GHCR_USERNAME }}/devops-project-client" >> $GITHUB_ENV
+          OWNER_LOWER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          REPO_LOWER="$(echo "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')"
+          IMAGE_PREFIX="ghcr.io/${OWNER_LOWER}/${REPO_LOWER}"
+          echo "SERVER_IMAGE=${IMAGE_PREFIX}-api" >> $GITHUB_ENV
+          echo "CLIENT_IMAGE=${IMAGE_PREFIX}-client" >> $GITHUB_ENV
 
       # ---------------------------
       # BUILD SERVER IMAGE
@@ -103,9 +111,9 @@ jobs:
       - name: Deliver Docker Compose file to server
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ vars.STAGING_SERVER_IP }}
-          username: ${{ vars.STAGING_SERVER_USERNAME }}
-          key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
+          host: ${{ vars.PROD_SERVER_IP }}
+          username: ${{ vars.PROD_SERVER_USERNAME }}
+          key: ${{ secrets.PROD_SERVER_SSH_KEY }}
           source: compose.deploy.yml
           target: ~/dowa/
 
@@ -115,13 +123,15 @@ jobs:
       - name: Run Docker Compose on server
         uses: appleboy/ssh-action@v1.2.5
         with:
-          host: ${{ vars.STAGING_SERVER_IP }}
-          username: ${{ vars.STAGING_SERVER_USERNAME }}
-          key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
+          host: ${{ vars.PROD_SERVER_IP }}
+          username: ${{ vars.PROD_SERVER_USERNAME }}
+          key: ${{ secrets.PROD_SERVER_SSH_KEY }}
           script: |
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
             cd ~/dowa
+
+            export VERSION="${{ steps.semver-app.outputs.version }}"
 
             docker compose -f compose.deploy.yml pull
             docker compose -f compose.deploy.yml up -d

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using server.DataAccess;
 using server.Dto;
+using server.FHHelper;
 using server.Services;
 using server.Utils;
 
@@ -9,36 +10,49 @@ namespace server.Controller;
 
 [ApiController]
 [Route("api/[controller]")]
-public class TaskController(MyDbContext ctx, ITaskService taskService ) : ControllerBase
+public class TaskController(MyDbContext ctx, ITaskService taskService, ITaskCommentService taskCommentService, FeatureStateProvider featureStateProvider ) : ControllerBase
 {
     private const string InvalidTaskIdMessage = "Invalid task id.";
+    private readonly ITaskCommentService _taskCommentService = taskCommentService;
+    private readonly FeatureStateProvider _featureStateProvider = featureStateProvider;
 
     [HttpGet("Users")]
     public async Task<IActionResult> GetUsers()
     {
-        return Ok(await ctx.Users.ToListAsync());
+        return !_featureStateProvider.IsEnabled("GetUsers")
+            ? throw new NotImplementedException("The 'GetUsers' feature is not enabled.")
+            : Ok(await ctx.Users.ToListAsync());
     }
 
     [HttpGet("Statuses")]
     public async Task<IActionResult> GetStatuses()
     {
+        if (!_featureStateProvider.IsEnabled("GetStatuses"))
+        {
+            throw new NotImplementedException("The 'GetStatuses' feature is not enabled.");
+        }
         var statuses = await ctx.TodoTaskStatuses
             .Where(s => s.DeletedAt == null)
             .OrderBy(s => s.Name)
-            .Select(s => new 
+            .Select(s => new
             {
                 s.Id,
                 s.Name,
                 s.CreatedAt
             })
             .ToListAsync();
-        
+
         return Ok(statuses);
     }
 
     [HttpGet(nameof(GetTaskById))]
     public async Task<ActionResult<TaskDto>> GetTaskById([FromQuery] string id)
     {
+        if (!_featureStateProvider.IsEnabled("GetTaskById"))
+        {
+            throw new NotImplementedException("The 'GetTaskById' feature is not enabled.");
+        }
+        
         if (!Guid.TryParse(id, out var taskId))
         {
             return BadRequest(InvalidTaskIdMessage);
@@ -54,6 +68,7 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
                 Title = t.Title,
                 Description = t.Description,
                 CreatedAt = t.CreatedAt,
+                DueDate = t.DueDate,
                 Status = t.Status.Name,
                 Assignee = t.Assignee == null
                     ? null
@@ -72,10 +87,61 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
 
         return task;
     }
+    
+    // Get comments for a task
+    [HttpGet("{id:guid}/comments")]
+    public async Task<ActionResult<List<TaskCommentDto>>> GetCommentsByTaskId(Guid id)
+    {
+        if (!_featureStateProvider.IsEnabled("GetCommentsByTaskId"))
+        {
+            throw new NotImplementedException("The 'GetCommentsByTaskId' feature is not enabled.");
+        }
+
+        try
+        {
+            var comments = await _taskCommentService.GetCommentsByTaskIdAsync(id);
+            return Ok(comments);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    // Create comment for a task
+    [HttpPost("{id:guid}/comments")]
+    public async Task<ActionResult<TaskCommentDto>> CreateComment(
+        Guid id,
+        [FromBody] CreateTaskCommentRequest request)
+    {
+        if (!_featureStateProvider.IsEnabled("CreateComment"))
+        {
+            throw new NotImplementedException("The 'CreateComment' feature is not enabled.");
+        }
+
+        try
+        {
+            var comment = await _taskCommentService.CreateCommentAsync(id, request);
+            return Ok(comment);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
 
     [HttpPost(nameof(MoveTask))]
     public async Task<ActionResult<TaskDto>> MoveTask([FromBody] MoveTaskRequest request)
     {
+        if(!_featureStateProvider.IsEnabled("MoveTask"))
+        {
+            throw new NotImplementedException("The 'MoveTask' feature is not enabled.");
+        }
+        
         var task = await ctx.TaskItems
             .Include(t => t.Assignee)
             .Include(t => t.Status)
@@ -110,21 +176,18 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
     [HttpPost(nameof(CreateTask))]
     public async Task<ActionResult<TaskDto>> CreateTask([FromBody] CreateTaskRequest request)
     {
+        if(!_featureStateProvider.IsEnabled("CreateTask"))
+        {
+            throw new NotImplementedException("The 'CreateTask' feature is not enabled.");
+        }
+        
         var defaultStatus = await ctx.TodoTaskStatuses
             .Where(s => s.Name == "To-do")
             .FirstOrDefaultAsync();
 
         if (defaultStatus == null)
         {
-            var todoStatus = new TodoTaskStatus()
-            {
-                Name = "To-do",
-                CreatedAt = DateTime.UtcNow,
-                DeletedAt = null
-            };
-            await ctx.TodoTaskStatuses.AddAsync(todoStatus);
-            await ctx.SaveChangesAsync();
-            defaultStatus = todoStatus;
+            throw new ArgumentException("Default status 'To-do' not found. Please ensure it exists in the database.");
         }
 
         User? user = null;
@@ -146,7 +209,8 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
             AssigneeId = request.AssigneeId,
             StatusId = defaultStatus.Id,
             Status = defaultStatus,
-            Assignee = user
+            Assignee = user,
+            DueDate = request.DueDate.HasValue ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc) : null
         };
 
         //For the history set the uploading user for 'system' at the moment, as we don't have auth yet
@@ -162,6 +226,11 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
     [HttpPut(nameof(UpdateTask))]
     public async Task<ActionResult<TaskDto>> UpdateTask([FromQuery] string id, [FromBody] UpdateTaskRequest request)
     {
+        if(!_featureStateProvider.IsEnabled("UpdateTask"))
+        {
+            throw new NotImplementedException("The 'UpdateTask' feature is not enabled.");
+        }
+        
         if (!Guid.TryParse(id, out var taskId))
         {
             return BadRequest(InvalidTaskIdMessage);
@@ -219,11 +288,12 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
                 {
                     return NotFound("User not found with id: " + request.AssigneeId);
                 }
+
                 task.AssigneeId = request.AssigneeId;
                 task.Assignee = user;
             }
         }
-
+        task.DueDate = request.DueDate.HasValue ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc) : null;
         await ctx.SaveChangesAsync();
         var saveHistory = new SaveTaskToHistory(ctx);
         var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
@@ -234,6 +304,11 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
     [HttpGet(nameof(GetArchivedTasks))]
     public async Task<List<TaskDto>> GetArchivedTasks()
     {
+        if (!_featureStateProvider.IsEnabled("GetArchivedTasks"))
+        {
+            throw new NotImplementedException("The 'GetArchivedTasks' feature is not enabled.");
+        }
+        
         return await ctx.TaskItems
             .Include(t => t.Assignee)
             .Include(t => t.Status)
@@ -248,6 +323,7 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
                 UpdatedAt = t.UpdatedAt,
                 DeletedAt = t.DeletedAt,
                 Status = t.Status.Name,
+                DueDate = t.DueDate,
                 Assignee = t.Assignee == null
                     ? null
                     : new UserDto
@@ -262,6 +338,10 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
     [HttpPatch(nameof(ArchiveTask))]
     public async Task<IActionResult> ArchiveTask([FromQuery] string id)
     {
+        if (!_featureStateProvider.IsEnabled("ArchiveTask"))
+        {
+            throw new NotImplementedException("The 'ArchiveTask' feature is not enabled.");
+        }
         if (!Guid.TryParse(id, out var taskId))
             return BadRequest(InvalidTaskIdMessage);
 
@@ -286,6 +366,10 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
     [HttpPatch(nameof(UnarchiveTask))]
     public async Task<IActionResult> UnarchiveTask([FromQuery] string id)
     {
+        if(!_featureStateProvider.IsEnabled("UnarchiveTask"))
+        {
+            throw new NotImplementedException("The 'UnarchiveTask' feature is not enabled.");
+        }
         if (!Guid.TryParse(id, out var taskId))
             return BadRequest(InvalidTaskIdMessage);
 
@@ -315,10 +399,14 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
 
         return NoContent();
     }
-        
+
     [HttpPatch(nameof(AssignTask))]
     public async Task<ActionResult<TaskDto>> AssignTask([FromQuery] string taskId, [FromQuery] string assigneeId)
     {
+        if (!_featureStateProvider.IsEnabled("AssignTask"))
+        {
+            throw new NotImplementedException("The 'AssignTask' feature is not enabled.");
+        }
         if (!Guid.TryParse(taskId, out var parsedTaskId))
             return BadRequest("Invalid task id.");
 
@@ -346,6 +434,10 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
     [HttpDelete(nameof(DeleteTask))]
     public async Task<IActionResult> DeleteTask([FromQuery] string id)
     {
+        if(!_featureStateProvider.IsEnabled("DeleteTask"))
+        {
+            throw new NotImplementedException("The 'DeleteTask' feature is not enabled.");
+        }
         if (!Guid.TryParse(id, out var taskId))
             return BadRequest(InvalidTaskIdMessage);
 
@@ -369,6 +461,10 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
     [HttpPost(nameof(ReopenTask))]
     public async Task<ActionResult<TaskDto>> ReopenTask([FromQuery] string id)
     {
+        if (!_featureStateProvider.IsEnabled("ReopenTask"))
+        {
+            throw new NotImplementedException("The 'ReopenTask' feature is not enabled.");
+        }
         if (!Guid.TryParse(id, out var taskId))
             return BadRequest(InvalidTaskIdMessage);
 
@@ -412,6 +508,7 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
             UpdatedAt = task.UpdatedAt,
             DeletedAt = task.DeletedAt,
             Status = task.Status.Name,
+            DueDate = task.DueDate,
             Assignee = task.Assignee == null
                 ? null
                 : new UserDto
@@ -427,10 +524,14 @@ public class TaskController(MyDbContext ctx, ITaskService taskService ) : Contro
         var systemUser = await ctx.Users.FirstOrDefaultAsync(u => u.Username == "system" && u.DeletedAt == null);
         return systemUser ?? throw new KeyNotFoundException("System user not found.");
     }
-    
+
     [HttpGet(nameof(GetTasks))]
     public async Task<ActionResult<List<TaskDto>>> GetTasks([FromQuery] TaskQueryParameters query)
     {
+        if (!_featureStateProvider.IsEnabled("GetTasks"))
+        {
+            throw new NotImplementedException("The 'GetTasks' feature is not enabled.");
+        }
         try
         {
             var tasks = await taskService.GetTasksByQueryAsync(query);

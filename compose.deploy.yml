@@ -1,15 +1,19 @@
     services:
       api:
-        image: ghcr.io/ervinhun/devops-exam-project-ervinhun-api:staging
+        image: ghcr.io/tboulund-devops/devops-exam-project-ervinhun-api:${VERSION}
+        env_file:
+          - .env
         container_name: todowithextras-api
         ports:
-          - "5000:5000"
+          - "5000:8080"
 
       client:
-        image: ghcr.io/ervinhun/devops-exam-project-ervinhun-client:staging
+        image: ghcr.io/tboulund-devops/devops-exam-project-ervinhun-client:${VERSION}
+        env_file:
+          - .env
         container_name: dowa-client
         ports:
-          - "80:80"
+          - "3000:5173"
         depends_on:
           - api
 

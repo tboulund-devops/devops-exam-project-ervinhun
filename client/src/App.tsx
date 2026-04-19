@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getTasks, getUsers, getStatuses, createTask, updateTask, deleteTask, moveTask } from './services/taskService';
+import { getTasks, getUsers, getStatuses, createTask, updateTask, deleteTask, moveTask, archiveTask } from './services/taskService';
 import type { TaskDto, UserDto, CreateTaskRequest } from './types';
 import type { StatusDto } from './services/taskService';
+import { getFeatureFlags } from './services/featureService';
+import type { FeatureFlags } from './services/featureService';
 import './App.css';
 
 const STATUSES = ['To-do', 'Doing', 'Review', 'Done'];
@@ -19,10 +21,11 @@ function App() {
   const [statuses, setStatuses] = useState<StatusDto[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState<string | null>(null);
+  const [features, setFeatures] = useState<FeatureFlags | null>(null);
 
   const [showModal,    setShowModal]    = useState(false);
   const [editingTask,  setEditingTask]  = useState<TaskDto | null>(null);
-  const [form,         setForm]         = useState<CreateTaskRequest>({ title: '', description: '', assigneeId: undefined });
+  const [form,         setForm]         = useState<CreateTaskRequest>({ title: '', description: '', assigneeId: undefined, dueDate: undefined });
   const [submitting,   setSubmitting]   = useState(false);
 
   const [movingTask,   setMovingTask]   = useState<TaskDto | null>(null);
@@ -34,10 +37,17 @@ function App() {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [t, u, s] = await Promise.all([getTasks(), getUsers(), getStatuses()]);
+      const [t, u, s, f] = await Promise.all([
+        getTasks(),
+        getUsers(),
+        getStatuses(),
+        getFeatureFlags()
+      ]);
+
       setTasks(t);
       setUsers(u);
       setStatuses(s);
+      setFeatures(f);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -48,30 +58,47 @@ function App() {
   useEffect(() => { load(); }, [load]);
 
   const openCreate = () => {
+    if (!features?.createTask) return;
     setEditingTask(null);
-    setForm({ title: '', description: '', assigneeId: undefined });
+    setForm({ title: '', description: '', assigneeId: undefined, dueDate: undefined });
     setShowModal(true);
   };
 
   const openEdit = (task: TaskDto) => {
+    if (!features?.updateTask) return;
     setEditingTask(task);
-    setForm({ title: task.title, description: task.description ?? '', assigneeId: task.assignee?.id });
+    setForm({ title: task.title, description: task.description ?? '', assigneeId: task.assignee?.id, dueDate: task.dueDate });
     setShowModal(true);
   };
 
   const openMove = (task: TaskDto) => {
+    if (!features?.moveTask) return;
     setMovingTask(task);
     setSelectedUser(users[0]?.id ?? '');
   };
 
   const handleSubmit = async () => {
     if (!form.title.trim()) return;
+
+    if (editingTask && !features?.updateTask) return;
+    if (!editingTask && !features?.createTask) return;
+
     setSubmitting(true);
     try {
       if (editingTask) {
-        await updateTask(editingTask.id, { title: form.title, description: form.description, assigneeId: form.assigneeId });
+        await updateTask(editingTask.id, {
+          title: form.title,
+          description: form.description,
+          assigneeId: form.assigneeId,
+          dueDate: form.dueDate
+        });
       } else {
-        await createTask({ title: form.title, description: form.description, assigneeId: form.assigneeId });
+        await createTask({
+          title: form.title,
+          description: form.description,
+          assigneeId: form.assigneeId,
+          dueDate: form.dueDate
+        });
       }
       setShowModal(false);
       await load();
@@ -83,7 +110,9 @@ function App() {
   };
 
   const handleMove = async (newStatusId: string) => {
+    if (!features?.moveTask) return;
     if (!movingTask || !selectedUser) return;
+
     try {
       await moveTask(movingTask.id, newStatusId, selectedUser);
       setMovingTask(null);
@@ -94,7 +123,9 @@ function App() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!features?.deleteTask) return;
     if (!confirm('Delete this task?')) return;
+
     try {
       await deleteTask(id);
       await load();
@@ -103,6 +134,17 @@ function App() {
     }
   };
 
+  const handleArchive = async (id: string) => {
+    if (!features?.archiveTask) return;
+    if (!confirm('Archive this task?')) return;
+
+    try {
+      await archiveTask(id);
+      await load();
+    } catch (e: any) {
+      alert('Error: ' + e.message);
+    }
+  };
   const filtered = tasks.filter(t => {
     const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) ||
         (t.description ?? '').toLowerCase().includes(search.toLowerCase());
@@ -134,10 +176,13 @@ function App() {
               <span className="stat-label">total</span>
             </div>
             <div className="stat-chip accent">
-              <span className="stat-num">{byStatus('In Progress').length}</span>
+              <span className="stat-num">{byStatus('Doing').length}</span>
               <span className="stat-label">active</span>
             </div>
-            <button className="btn-primary" onClick={openCreate}>+ New Task</button>
+
+            {features?.createTask && (
+                <button className="btn-primary" onClick={openCreate}>+ New Task</button>
+            )}
           </div>
         </header>
 
@@ -201,9 +246,33 @@ function App() {
                             {task.status}
                           </span>
                                     <div className="card-actions">
-                                      <button className="icon-btn move" onClick={() => openMove(task)} title="Move">⇄</button>
-                                      <button className="icon-btn edit" onClick={() => openEdit(task)} title="Edit">✎</button>
-                                      <button className="icon-btn del"  onClick={() => handleDelete(task.id)} title="Delete">✕</button>
+                                      {features?.moveTask && (
+                                          <button className="icon-btn move" onClick={() => openMove(task)} title="Move">
+                                            ⇄
+                                          </button>
+                                      )}
+
+                                      {features?.updateTask && (
+                                          <button className="icon-btn edit" onClick={() => openEdit(task)} title="Edit">
+                                            ✎
+                                          </button>
+                                      )}
+
+                                      {features?.archiveTask && (
+                                          <button
+                                              className="icon-btn archive"
+                                              onClick={() => handleArchive(task.id)}
+                                              title="Archive"
+                                          >
+                                            🗄
+                                          </button>
+                                      )}
+
+                                      {features?.deleteTask && (
+                                          <button className="icon-btn del" onClick={() => handleDelete(task.id)} title="Delete">
+                                            ✕
+                                          </button>
+                                      )}
                                     </div>
                                   </div>
                                   <h3 className="card-title">{task.title}</h3>
@@ -218,6 +287,9 @@ function App() {
                                         <span className="unassigned">Unassigned</span>
                                     )}
                                     <span className="card-date">{formatDate(task.createdAt)}</span>
+                                    {features?.taskExpiry && task.dueDate && (
+                                        <span className="card-date">Due: {formatDate(task.dueDate)}</span>
+                                    )}
                                   </div>
                                 </div>
                             ))
@@ -230,7 +302,7 @@ function App() {
         )}
 
         {/* Create/Edit Modal */}
-        {showModal && (
+        {showModal && (features?.createTask || features?.updateTask) && (
             <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false); }}>
               <div className="modal">
                 <div className="modal-header">
@@ -263,6 +335,17 @@ function App() {
                     <option value="">Unassigned</option>
                     {users.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
                   </select>
+                  {features?.taskExpiry && (
+                      <>
+                        <label className="field-label">Due Date</label>
+                        <input
+                            type="date"
+                            className="field-input"
+                            value={form.dueDate ?? ''}
+                            onChange={e => setForm(f => ({ ...f, dueDate: e.target.value || undefined }))}
+                        />
+                      </>
+                  )}
                 </div>
                 <div className="modal-footer">
                   <button className="btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
@@ -279,7 +362,7 @@ function App() {
         )}
 
         {/* Move Modal */}
-        {movingTask && (
+        {movingTask && features?.moveTask &&(
             <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setMovingTask(null); }}>
               <div className="modal">
                 <div className="modal-header">

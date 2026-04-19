@@ -10,6 +10,7 @@ public class TaskDto
     public DateTime? DeletedAt { get; set; }
     public required string Status { get; set; }
     public UserDto? Assignee { get; set; }
+    public DateTime? DueDate { get; set; }
 }
 
 public class UserDto
