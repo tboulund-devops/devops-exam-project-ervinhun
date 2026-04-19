@@ -115,6 +115,7 @@ jobs:
       - name: Start API in background
         env:
           ASPNETCORE_ENVIRONMENT: Development
+          FEATURE_HUB_BYPASS: "true"
         run: |
           nohup dotnet run --project ./server/server.csproj --configuration Release > api.log 2>&1 &
 
@@ -130,6 +131,29 @@ jobs:
           echo "API did not start in time"
           cat api.log
           exit 1
+
+      - name: Smoke-check Task endpoint before k6
+        run: |
+          CURL_EXIT=0
+          STATUS_CODE=$(curl -sS -o smoke-response.json -w "%{http_code}" "$API_BASE_URL/api/Task/GetTasks") || CURL_EXIT=$?
+
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            STATUS_CODE="000"
+          fi
+
+          if [ "$CURL_EXIT" -ne 0 ] || [ "$STATUS_CODE" -lt 200 ] || [ "$STATUS_CODE" -ge 300 ]; then
+            echo "Task endpoint smoke check failed (curl exit: $CURL_EXIT, http: $STATUS_CODE)"
+            echo "--- response body (first 2000 chars) ---"
+            if [ -f smoke-response.json ]; then
+              head -c 2000 smoke-response.json || true
+            else
+              echo "No response body captured."
+            fi
+            echo
+            echo "--- api.log (last 200 lines) ---"
+            tail -n 200 api.log || true
+            exit 1
+          fi
 
       - name: Run k6 performance smoke test
         run: BASE_URL="$API_BASE_URL" k6 run ./LoadTesting.Tests/pipeline-smoke.js
