@@ -9,6 +9,7 @@ export interface FeatureFlags {
     deleteTask: boolean;
     moveTask: boolean;
     getTasks: boolean;
+    taskExpiry: boolean;
 }
 
 export const getFeatureFlags = () => 

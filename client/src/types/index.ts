@@ -8,6 +8,7 @@ export interface TaskDto {
     title: string;
     description?: string;
     createdAt: string;
+    dueDate?: string;
     status: string;
     assignee?: UserDto;
 }
@@ -16,12 +17,14 @@ export interface CreateTaskRequest {
     title: string;
     description?: string;
     assigneeId?: string;
+    dueDate?: string;
 }
 
 export interface UpdateTaskRequest {
     title: string;
     description?: string;
     assigneeId?: string;
+    dueDate?: string;
 }
 
 export interface MoveTaskRequest {

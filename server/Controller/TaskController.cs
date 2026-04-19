@@ -210,7 +210,7 @@ public class TaskController(MyDbContext ctx, ITaskService taskService, ITaskComm
             StatusId = defaultStatus.Id,
             Status = defaultStatus,
             Assignee = user,
-            DueDate = request.DueDate
+            DueDate = request.DueDate.HasValue ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc) : null
         };
 
         //For the history set the uploading user for 'system' at the moment, as we don't have auth yet
@@ -293,7 +293,7 @@ public class TaskController(MyDbContext ctx, ITaskService taskService, ITaskComm
                 task.Assignee = user;
             }
         }
-        task.DueDate = request.DueDate;
+        task.DueDate = request.DueDate.HasValue ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc) : null;
         await ctx.SaveChangesAsync();
         var saveHistory = new SaveTaskToHistory(ctx);
         var systemUser = await GetSystemUserBeforeWeImplementAuthentication();
